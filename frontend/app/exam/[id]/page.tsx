@@ -1,0 +1,257 @@
+"use client"
+
+import { use, useCallback, useEffect, useRef, useState } from "react"
+import FaceMonitor from "@/components/examguard/FaceMonitor"
+import { useWebSocket } from "@/lib/ws"
+
+const WS_BASE = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8000"
+
+const SAMPLE_QUESTIONS = [
+  {
+    n: 1,
+    text: "Explain the time complexity of QuickSort in the average and worst case. Why is the average case O(n log n)?",
+  },
+  {
+    n: 2,
+    text: "What is a deadlock? Describe the four necessary conditions (Coffman conditions) for a deadlock to occur.",
+  },
+  {
+    n: 3,
+    text: "Write pseudocode for Dijkstra's shortest path algorithm and analyse its time complexity using a min-heap.",
+  },
+]
+
+export default function StudentExamPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id: examId } = use(params)
+  const wsUrl = `${WS_BASE}/ws/exam/${examId}`
+
+  const { status, send } = useWebSocket(wsUrl)
+
+  const [currentQ,  setCurrentQ]  = useState(0)
+  const [answers,   setAnswers]   = useState<Record<number, string>>({})
+  const [timeLeft,  setTimeLeft]  = useState(60 * 60)   // 60 min in seconds
+  const [tabCount,  setTabCount]  = useState(0)
+  const [submitted, setSubmitted] = useState(false)
+
+  const lastKeystroke = useRef<number>(Date.now())
+  const keystrokeCount = useRef(0)
+  const wpmSamples    = useRef<number[]>([])
+
+  // ── Countdown ────────────────────────────────────────────
+  useEffect(() => {
+    if (submitted) return
+    const t = setInterval(() => setTimeLeft((s) => Math.max(0, s - 1)), 1000)
+    return () => clearInterval(t)
+  }, [submitted])
+
+  function formatTime(s: number) {
+    const h = Math.floor(s / 3600)
+    const m = Math.floor((s % 3600) / 60)
+    const sec = s % 60
+    if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`
+    return `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`
+  }
+
+  // ── Tab visibility tracking ───────────────────────────────
+  useEffect(() => {
+    if (submitted || status !== "open") return
+
+    function onVisibilityChange() {
+      const ts = Date.now() / 1000
+      const evType = document.hidden ? "hidden" : "visible"
+      send({ type: "tab_event", event_type: evType, timestamp: ts })
+      if (document.hidden) setTabCount((c) => c + 1)
+    }
+
+    function onBlur() {
+      send({ type: "tab_event", event_type: "blur", timestamp: Date.now() / 1000 })
+    }
+
+    document.addEventListener("visibilitychange", onVisibilityChange)
+    window.addEventListener("blur", onBlur)
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange)
+      window.removeEventListener("blur", onBlur)
+    }
+  }, [status, submitted, send])
+
+  // ── Keystroke tracking ────────────────────────────────────
+  function handleKeydown() {
+    const now = Date.now()
+    const gap = now - lastKeystroke.current
+    keystrokeCount.current += 1
+
+    if (gap > 0 && gap < 2000) {
+      const wpm = (1 / (gap / 1000)) * 60 / 5
+      wpmSamples.current.push(Math.min(wpm, 300))
+    }
+
+    lastKeystroke.current = now
+
+    // Flush keystroke stats every 20 keystrokes
+    if (keystrokeCount.current % 20 === 0 && wpmSamples.current.length > 0) {
+      const samples = wpmSamples.current
+      const avg = samples.reduce((a, b) => a + b, 0) / samples.length
+      const std = Math.sqrt(samples.map((x) => (x - avg) ** 2).reduce((a, b) => a + b, 0) / samples.length)
+      send({
+        type: "keystroke_stats",
+        avg_wpm: Math.round(avg),
+        std_wpm: Math.round(std),
+        pause_count: samples.filter((v) => v < 5).length,
+        burst_count: samples.filter((v) => v > 120).length,
+        total_keystrokes: keystrokeCount.current,
+        timestamp: Date.now() / 1000,
+      })
+      wpmSamples.current = []
+    }
+  }
+
+  // ── Copy-paste detection ──────────────────────────────────
+  function handlePaste(e: React.ClipboardEvent) {
+    const len = e.clipboardData.getData("text").length
+    send({ type: "copy_paste", content_length: len, timestamp: Date.now() / 1000 })
+  }
+
+  // ── Face event forwarding ─────────────────────────────────
+  const onFaceEvent = useCallback(
+    (faceCount: number, confidence: number) => {
+      if (status === "open") {
+        send({ type: "face_event", face_count: faceCount, confidence, timestamp: Date.now() / 1000 })
+      }
+    },
+    [status, send],
+  )
+
+  // ── Submit ────────────────────────────────────────────────
+  function handleSubmit() {
+    send({ type: "end_exam", timestamp: Date.now() / 1000 })
+    setSubmitted(true)
+  }
+
+  if (submitted) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center text-center px-6">
+        <span className="text-5xl mb-4">✅</span>
+        <h2 className="text-2xl font-bold mb-2">Exam Submitted</h2>
+        <p className="text-sentinel-muted text-sm max-w-sm">
+          Your responses have been saved. The invigilator will receive an AI integrity report shortly.
+        </p>
+        <p className="mt-4 text-xs font-mono text-sentinel-muted">Session: {examId}</p>
+      </div>
+    )
+  }
+
+  const q = SAMPLE_QUESTIONS[currentQ]
+
+  return (
+    <div className="min-h-screen bg-[#f8f9fc] text-slate-800 flex flex-col">
+      {/* Header */}
+      <header className="sticky top-0 z-10 flex items-center gap-4 px-6 py-3 bg-white border-b border-slate-200 shadow-sm">
+        <div className="flex-1">
+          <h1 className="text-sm font-semibold text-slate-700">Data Structures — Midterm Exam</h1>
+          <p className="text-xs text-slate-400 font-mono">Session: {examId}</p>
+        </div>
+
+        {/* Timer */}
+        <div className={`font-mono text-lg font-bold tabular-nums ${timeLeft < 300 ? "text-red-500" : "text-slate-700"}`}>
+          {formatTime(timeLeft)}
+        </div>
+
+        {/* Monitoring indicator */}
+        <div className="flex items-center gap-2 text-xs text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-full px-3 py-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          Monitored
+        </div>
+
+        {/* Hidden camera feed */}
+        <div className="w-20 rounded-lg overflow-hidden">
+          <FaceMonitor onFaceEvent={onFaceEvent} active={status === "open"} />
+        </div>
+      </header>
+
+      {/* Body */}
+      <main className="flex-1 max-w-3xl mx-auto w-full px-6 py-10">
+        {/* Question nav */}
+        <div className="flex gap-2 mb-8">
+          {SAMPLE_QUESTIONS.map((sq, i) => (
+            <button
+              key={i}
+              onClick={() => setCurrentQ(i)}
+              className={`w-9 h-9 rounded-lg text-sm font-medium transition-colors ${
+                i === currentQ
+                  ? "bg-indigo-600 text-white"
+                  : answers[i]
+                  ? "bg-indigo-100 text-indigo-700"
+                  : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+              }`}
+            >
+              {i + 1}
+            </button>
+          ))}
+        </div>
+
+        {/* Question */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-6 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full">
+              Question {q.n}
+            </span>
+            <span className="text-xs text-slate-400">10 marks</span>
+          </div>
+          <p className="text-slate-700 leading-relaxed">{q.text}</p>
+        </div>
+
+        {/* Answer */}
+        <textarea
+          rows={12}
+          value={answers[currentQ] ?? ""}
+          onChange={(e) => setAnswers((a) => ({ ...a, [currentQ]: e.target.value }))}
+          onKeyDown={handleKeydown}
+          onPaste={handlePaste}
+          placeholder="Write your answer here…"
+          className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl text-sm leading-relaxed
+                     text-slate-800 placeholder:text-slate-400 resize-none shadow-sm
+                     focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100
+                     transition-all"
+        />
+
+        {/* Navigation */}
+        <div className="flex items-center justify-between mt-6">
+          <button
+            onClick={() => setCurrentQ((q) => Math.max(0, q - 1))}
+            disabled={currentQ === 0}
+            className="px-5 py-2 text-sm rounded-xl border border-slate-200 text-slate-600
+                       hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          >
+            ← Previous
+          </button>
+
+          {currentQ < SAMPLE_QUESTIONS.length - 1 ? (
+            <button
+              onClick={() => setCurrentQ((q) => q + 1)}
+              className="px-5 py-2 text-sm rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+            >
+              Next →
+            </button>
+          ) : (
+            <button
+              onClick={handleSubmit}
+              className="px-6 py-2 text-sm rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 font-medium transition-colors"
+            >
+              Submit Exam
+            </button>
+          )}
+        </div>
+      </main>
+
+      {/* Warning banner if tab switched */}
+      {tabCount > 0 && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2
+                        bg-yellow-50 border border-yellow-300 text-yellow-800 text-xs rounded-xl
+                        px-4 py-2.5 shadow-lg z-50">
+          ⚠️ Tab switching detected ({tabCount}×) — this session is being monitored.
+        </div>
+      )}
+    </div>
+  )
+}

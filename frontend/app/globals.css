@@ -1,0 +1,35 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: dark; }
+
+body {
+  background-color: #0a0a0f;
+  color: #e2e8f0;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #111118; }
+::-webkit-scrollbar-thumb { background: #1e1e2e; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #2e2e4e; }
+
+/* Terminal cursor */
+.cursor::after {
+  content: "▋";
+  animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+/* Severity pill */
+.pill-critical { @apply bg-red-500/15 text-red-400 border border-red-500/30; }
+.pill-high     { @apply bg-orange-500/15 text-orange-400 border border-orange-500/30; }
+.pill-medium   { @apply bg-yellow-500/15 text-yellow-400 border border-yellow-500/30; }
+.pill-low      { @apply bg-blue-500/15 text-blue-400 border border-blue-500/30; }
