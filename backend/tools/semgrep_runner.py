@@ -3,12 +3,21 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
+import sys
+
+
+def _semgrep_bin() -> str:
+    venv_bin = os.path.join(os.path.dirname(sys.executable), "semgrep")
+    if os.path.isfile(venv_bin):
+        return venv_bin
+    return "semgrep"
 
 
 def run_semgrep(repo_path: str) -> list[dict]:
     result = subprocess.run(
-        ["semgrep", "--config", "auto", repo_path, "--json", "--quiet"],
+        [_semgrep_bin(), "--config", "auto", repo_path, "--json", "--quiet"],
         capture_output=True,
         text=True,
         timeout=180,

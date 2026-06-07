@@ -1,6 +1,6 @@
 "use client"
 
-import { use, useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import FaceMonitor from "@/components/examguard/FaceMonitor"
 import { useWebSocket } from "@/lib/ws"
 
@@ -21,8 +21,8 @@ const SAMPLE_QUESTIONS = [
   },
 ]
 
-export default function StudentExamPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id: examId } = use(params)
+export default function StudentExamPage({ params }: { params: { id: string } }) {
+  const { id: examId } = params
   const wsUrl = `${WS_BASE}/ws/exam/${examId}`
 
   const { status, send } = useWebSocket(wsUrl)

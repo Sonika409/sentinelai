@@ -17,7 +17,7 @@ import logging
 import time
 from typing import Literal
 
-from langchain_anthropic import ChatAnthropic
+from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
@@ -26,7 +26,13 @@ from .exam_state import ExamSession
 
 logger = logging.getLogger(__name__)
 
-llm = ChatAnthropic(model="claude-sonnet-4-6", temperature=0)
+_llm = None
+
+def get_llm():
+    global _llm
+    if _llm is None:
+        _llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
+    return _llm
 
 
 # ══════════════════════════════════════════════════════════════
@@ -110,7 +116,7 @@ def behavior_analyzer_node(state: ExamSession) -> dict:
         "keystroke_stats":          ks,
     }
 
-    response = llm.invoke([
+    response = get_llm().invoke([
         SystemMessage(content="""You are an exam integrity behavior analysis agent.
 Analyze the session summary and identify suspicious behavioral patterns.
 Return a JSON array of BehaviorFlag objects, each with:
@@ -159,7 +165,7 @@ def anomaly_scorer_node(state: ExamSession) -> dict:
             "agent_logs": ["[AnomalyScorer] No flags to score."],
         }
 
-    response = llm.invoke([
+    response = get_llm().invoke([
         SystemMessage(content="""You are an exam anomaly scoring agent.
 For each behavioral flag category present, assign a suspicion score.
 Return a JSON array:
@@ -204,7 +210,7 @@ def alert_generator_node(state: ExamSession) -> dict:
             "agent_logs": ["[AlertGenerator] Nothing to alert."],
         }
 
-    response = llm.invoke([
+    response = get_llm().invoke([
         SystemMessage(content="""You are an exam integrity alert generation agent.
 Convert behavioral flags and anomaly scores into prioritised invigilator alerts.
 Return a JSON array ordered by severity (CRITICAL first):
@@ -259,7 +265,7 @@ def report_generator_node(state: ExamSession) -> dict:
     else:
         verdict = "FLAGGED"
 
-    response = llm.invoke([
+    response = get_llm().invoke([
         SystemMessage(content="""You are an exam integrity report writer.
 Write a concise report for an academic integrity officer.
 Return JSON:

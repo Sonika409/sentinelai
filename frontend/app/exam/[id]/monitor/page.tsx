@@ -1,6 +1,6 @@
 "use client"
 
-import { use, useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import AgentFeed from "@/components/vulnsentinel/AgentFeed"
 import AlertFeed, { type Alert } from "@/components/examguard/AlertFeed"
 import IntegrityScore from "@/components/examguard/IntegrityScore"
@@ -18,8 +18,8 @@ interface Report {
   raw_stats:       { tab_blur_count: number; face_absent_count: number; multi_face_count: number; copy_paste_count: number }
 }
 
-export default function InvigilatorMonitor({ params }: { params: Promise<{ id: string }> }) {
-  const { id: examId } = use(params)
+export default function InvigilatorMonitor({ params }: { params: { id: string } }) {
+  const { id: examId } = params
 
   const [alerts,       setAlerts]       = useState<Alert[]>([])
   const [analysisLogs, setAnalysisLogs] = useState<string[]>([])

@@ -1,6 +1,6 @@
 "use client"
 
-import { use, useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import AgentFeed from "@/components/vulnsentinel/AgentFeed"
 import VulnCard from "@/components/vulnsentinel/VulnCard"
 import { useWebSocket } from "@/lib/ws"
@@ -24,8 +24,8 @@ interface Report {
   summary: { executive_summary: string; risk_score: number; overall_risk: string; key_recommendations: string[] }
 }
 
-export default function ScanDashboard({ params }: { params: Promise<{ id: string }> }) {
-  const { id: scanId } = use(params)
+export default function ScanDashboard({ params }: { params: { id: string } }) {
+  const { id: scanId } = params
   const wsUrl = `${WS_BASE}/ws/${scanId}`
 
   const [logs, setLogs]       = useState<string[]>([])

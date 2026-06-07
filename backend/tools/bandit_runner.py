@@ -3,12 +3,21 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
+import sys
+
+
+def _bandit_bin() -> str:
+    venv_bin = os.path.join(os.path.dirname(sys.executable), "bandit")
+    if os.path.isfile(venv_bin):
+        return venv_bin
+    return "bandit"
 
 
 def run_bandit(repo_path: str) -> list[dict]:
     result = subprocess.run(
-        ["bandit", "-r", repo_path, "-f", "json", "-q"],
+        [_bandit_bin(), "-r", repo_path, "-f", "json", "-q"],
         capture_output=True,
         text=True,
         timeout=120,

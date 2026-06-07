@@ -134,7 +134,7 @@ cd backend
 
 # Configure environment
 cp .env.example .env
-# Edit .env and set ANTHROPIC_API_KEY=sk-ant-...
+# Edit .env and set GROQ_API_KEY=gsk_...   (free at console.groq.com)
 
 # Install dependencies
 python -m venv .venv && source .venv/bin/activate

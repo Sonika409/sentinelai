@@ -17,7 +17,7 @@ import logging
 import uuid
 from typing import AsyncGenerator, Literal
 
-from langchain_anthropic import ChatAnthropic
+from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
@@ -26,7 +26,13 @@ from .state import ScanState
 
 logger = logging.getLogger(__name__)
 
-llm = ChatAnthropic(model="claude-sonnet-4-6", temperature=0)
+_llm = None
+
+def get_llm():
+    global _llm
+    if _llm is None:
+        _llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
+    return _llm
 
 
 # ══════════════════════════════════════════════════════════════
@@ -56,7 +62,7 @@ def _log(msg: str) -> list[str]:
 
 def orchestrator_node(state: ScanState) -> dict:
     """Uses LLM to plan the scan strategy before handing off to the scanner."""
-    response = llm.invoke([
+    response = get_llm().invoke([
         SystemMessage(content="""You are a security orchestrator agent.
 Given a repository URL, output a JSON scan plan:
 {
@@ -141,7 +147,7 @@ def vuln_analyzer_node(state: ScanState) -> dict:
     """Maps raw static-analysis findings to structured Vulnerability objects."""
     findings_json = json.dumps(state["raw_findings"][:25], indent=2)  # cap for token budget
 
-    response = llm.invoke([
+    response = get_llm().invoke([
         SystemMessage(content="""You are a vulnerability analysis agent.
 Map raw static analysis findings to structured vulnerability objects.
 Return a JSON array. Each object must have:
@@ -190,7 +196,7 @@ def exploit_reasoner_node(state: ScanState) -> dict:
             "agent_logs": ["[ExploitReasoner] No HIGH/CRITICAL findings — skipping."],
         }
 
-    response = llm.invoke([
+    response = get_llm().invoke([
         SystemMessage(content="""You are an exploit reasoning agent.
 For each vulnerability explain how an attacker would exploit it.
 Return a JSON array. Each object must have:
@@ -237,7 +243,7 @@ def fix_suggester_node(state: ScanState) -> dict:
     logs = []
 
     for vuln in targets:
-        response = llm.invoke([
+        response = get_llm().invoke([
             SystemMessage(content="""You are a secure code fix agent.
 Generate a targeted code patch for the vulnerability provided.
 Return a single JSON object:
@@ -277,7 +283,7 @@ def report_generator_node(state: ScanState) -> dict:
     critical = [v for v in state.get("vulnerabilities", []) if v["severity"] == "CRITICAL"]
     high = [v for v in state.get("vulnerabilities", []) if v["severity"] == "HIGH"]
 
-    response = llm.invoke([
+    response = get_llm().invoke([
         SystemMessage(content="""You are a security report writer.
 Produce an executive summary for a security audit.
 Return a JSON object:
