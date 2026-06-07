@@ -18,11 +18,36 @@ A proctoring system that monitors online exams in real time using tab-switch det
 
 ## Demo
 
-| VulnSentinel — Live Agent Feed | ExamGuard — Invigilator Dashboard |
-|---|---|
-| *(screenshot)* | *(screenshot)* |
+> 📹 **Demo video:** *(add link after recording)*
 
-> 📹 **Demo video:** *(link)*
+### VulnSentinel — 18 vulnerabilities found in OWASP Mutillidae
+
+```
+Risk Score: 85/100 · Overall Risk: CRITICAL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CRITICAL  12   HIGH  4   MEDIUM  2   LOW  0
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[CRITICAL] A03 Injection  — Command injection via exec() in content-security-policy.php:119
+[CRITICAL] A03 Injection  — User data flows into SQL string in edit-account-profile.php:125
+[CRITICAL] A07 Sec Misc   — Snyk API Key leaked in .github/workflows/scan-with-snyk-code.yml
+[CRITICAL] A07 Sec Misc   — Hardcoded JWT token in src/includes/hints/jwt-hint.inc:46
+[HIGH]     A03 Injection  — shell_exec() with unsanitised $domain in dns-lookup.php:165
+[HIGH]     A05 Sec Misc   — SSL verification disabled in RemoteFileHandler.php:62
+... + 12 more  · 16 auto-generated patches
+```
+
+### ExamGuard — Real-time proctoring demo
+
+```
+[00:12] ⚠  WARNING  Tab switch detected (1/3)
+[00:34] ⚠  WARNING  Tab switch detected (2/3)
+[00:41] 🚨 CRITICAL Face absent > 30 s continuous
+[01:02] ⚠  WARNING  Copy-paste event detected (1/2)
+[01:44] 🚨 CRITICAL Tab switch threshold reached (7)
+
+Post-session analysis complete
+Integrity Score: 58/100 · Verdict: FLAGGED 🚨
+```
 
 ---
 
@@ -56,7 +81,7 @@ A proctoring system that monitors online exams in real time using tab-switch det
 │  │ → fix_suggester     │         │ → report_generator   │        │
 │  │ → report_generator  │         └─────────────────────┘        │
 │  └─────────────────────┘                                         │
-│              Powered by Claude claude-sonnet-4-6 API                      │
+│         Powered by Groq · Llama 3.3 70B (llama-3.3-70b-versatile)         │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -67,7 +92,7 @@ A proctoring system that monitors online exams in real time using tab-switch det
 | Layer | Technology |
 |-------|-----------|
 | Agent framework | [LangGraph](https://github.com/langchain-ai/langgraph) |
-| LLM | Claude claude-sonnet-4-6 (Anthropic API) |
+| LLM | Llama 3.3 70B via [Groq](https://console.groq.com) (free tier) |
 | Backend | Python 3.11 · FastAPI · WebSockets |
 | Static analysis | Semgrep · Bandit |
 | Frontend | Next.js 14 · TypeScript · Tailwind CSS |
@@ -125,7 +150,7 @@ sentinelai/
 - Node.js 18+
 - [Semgrep](https://semgrep.dev/docs/getting-started/) — `pip install semgrep`
 - [Bandit](https://bandit.readthedocs.io/) — `pip install bandit`
-- Anthropic API key → [console.anthropic.com](https://console.anthropic.com)
+- Groq API key (free) → [console.groq.com](https://console.groq.com)
 
 ### 1 — Backend
 
