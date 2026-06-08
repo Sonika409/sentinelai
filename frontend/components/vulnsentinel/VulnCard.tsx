@@ -6,6 +6,13 @@ interface Vulnerability {
   category: string
   description: string
   cve?: string | null
+  // port scan extras
+  port?: number
+  service?: string
+  banner?: string
+  cwes?: string[]
+  all_cves?: string[]
+  recommendation?: string
 }
 
 interface Patch {
@@ -23,17 +30,13 @@ const SEVERITY_PILL: Record<string, string> = {
   LOW:      "pill-low",
 }
 
-export default function VulnCard({
-  vuln,
-  patch,
-}: {
-  vuln: Vulnerability
-  patch?: Patch
-}) {
-  const pill = SEVERITY_PILL[vuln.severity] ?? "pill-low"
+export default function VulnCard({ vuln, patch }: { vuln: Vulnerability; patch?: Patch }) {
+  const pill       = SEVERITY_PILL[vuln.severity] ?? "pill-low"
+  const isPortScan = vuln.id?.startsWith("PORT-")
 
   return (
     <div className="border border-sentinel-border bg-sentinel-surface rounded-xl p-4 space-y-3 animate-slide-in">
+
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2 flex-wrap">
@@ -41,6 +44,15 @@ export default function VulnCard({
             {vuln.severity}
           </span>
           <span className="text-xs text-sentinel-muted font-mono">{vuln.id}</span>
+
+          {/* Port badge */}
+          {isPortScan && vuln.port && (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20 font-mono">
+              {vuln.port}/{vuln.service}
+            </span>
+          )}
+
+          {/* Primary CVE */}
           {vuln.cve && (
             <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono">
               {vuln.cve}
@@ -53,14 +65,66 @@ export default function VulnCard({
       {/* Description */}
       <p className="text-sm text-slate-300 leading-relaxed">{vuln.description}</p>
 
-      {/* Location */}
-      <div className="flex items-center gap-1.5 text-xs font-mono text-sentinel-muted">
-        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-        </svg>
-        <span className="truncate">{vuln.file}</span>
-        {vuln.line > 0 && <span className="shrink-0 text-slate-500">:{vuln.line}</span>}
-      </div>
+      {/* Port-specific details */}
+      {isPortScan && (
+        <div className="space-y-2">
+
+          {/* Banner */}
+          {vuln.banner && vuln.banner !== "—" && (
+            <div className="text-xs font-mono bg-black/30 border border-sentinel-border rounded-lg px-3 py-2">
+              <span className="text-sentinel-muted mr-2">Banner:</span>
+              <span className="text-slate-300">{vuln.banner}</span>
+            </div>
+          )}
+
+          {/* All CVEs */}
+          {vuln.all_cves && vuln.all_cves.length > 0 && (
+            <div className="space-y-1">
+              <p className="text-xs text-sentinel-muted font-mono uppercase tracking-wider">Known CVEs</p>
+              <div className="flex flex-wrap gap-1.5">
+                {vuln.all_cves.map((cve) => (
+                  <span key={cve} className="text-xs px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono">
+                    {cve}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* CWEs */}
+          {vuln.cwes && vuln.cwes.length > 0 && (
+            <div className="space-y-1">
+              <p className="text-xs text-sentinel-muted font-mono uppercase tracking-wider">CWEs</p>
+              <div className="flex flex-wrap gap-1.5">
+                {vuln.cwes.map((cwe) => (
+                  <span key={cwe} className="text-xs px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20 font-mono">
+                    {cwe.split(" ")[0]}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Recommendation */}
+          {vuln.recommendation && (
+            <p className="text-xs text-sentinel-green">
+              <span className="text-sentinel-muted mr-1">Fix:</span>
+              {vuln.recommendation}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* File / location (non-port findings) */}
+      {!isPortScan && (
+        <div className="flex items-center gap-1.5 text-xs font-mono text-sentinel-muted">
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+          <span className="truncate">{vuln.file}</span>
+          {vuln.line > 0 && <span className="shrink-0 text-slate-500">:{vuln.line}</span>}
+        </div>
+      )}
 
       {/* Patch */}
       {patch && (
@@ -73,7 +137,7 @@ export default function VulnCard({
           </summary>
           <div className="mt-3 space-y-2 text-xs font-mono">
             <div>
-              <div className="text-red-400/70 mb-1">− Original</div>
+              <div className="text-red-400/70 mb-1">- Original</div>
               <pre className="bg-red-500/5 border border-red-500/20 rounded-lg p-3 text-red-400 overflow-x-auto whitespace-pre-wrap break-all">
                 {patch.original_code}
               </pre>

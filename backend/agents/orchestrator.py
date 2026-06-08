@@ -155,8 +155,10 @@ def _scan_github(state: ScanState) -> dict:
 
 
 def _scan_website(state: ScanState) -> dict:
-    """Run HTTP-based security checks against a live website."""
+    """Run HTTP-based security checks + port scan against a live website."""
     from tools.website_scanner import scan_website
+    from tools.port_scanner import scan_ports
+    from urllib.parse import urlparse
 
     try:
         logs = [
@@ -172,6 +174,26 @@ def _scan_website(state: ScanState) -> dict:
 
         logs.append(f"[Scanner] HTTP checks complete — {len(raw_findings)} raw findings")
         logs.append(f"[Scanner] Severity breakdown: {by_sev}")
+
+        # Port scan
+        host = urlparse(state["repo_url"]).hostname or state["repo_url"]
+        logs.append(f"[Scanner] Starting port scan on {host} ({len(__import__('tools.port_scanner', fromlist=['COMMON_PORTS']).COMMON_PORTS)} common ports)…")
+        port_findings = scan_ports(host)
+
+        open_ports = [p for p in port_findings if "port" in p]
+        critical_ports = [p for p in open_ports if p["severity"] in ("CRITICAL", "HIGH")]
+
+        if open_ports:
+            port_list = ", ".join(f"{p['port']}/{p['service']}" for p in open_ports)
+            logs.append(f"[Scanner] Open ports ({len(open_ports)}): {port_list}")
+        else:
+            logs.append(f"[Scanner] No common high-risk ports found open")
+
+        if critical_ports:
+            for p in critical_ports:
+                logs.append(f"[Scanner] {p['severity']} RISK — {p['port']}/{p['service']}: {p['description']}")
+
+        raw_findings = raw_findings + port_findings
 
         return {
             "repo_path": "",
@@ -197,7 +219,30 @@ def _scan_website(state: ScanState) -> dict:
 def vuln_analyzer_node(state: ScanState) -> dict:
     """Maps raw static-analysis findings to structured Vulnerability objects."""
     from tools.owasp_data import get_owasp_context
-    findings_json = json.dumps(state["raw_findings"][:25], indent=2)  # cap for token budget
+
+    # Port scan findings already have CVE/CWE data — promote them directly
+    port_vulns = []
+    for i, f in enumerate(state["raw_findings"]):
+        if f.get("type") == "port_exposure" and "port" in f:
+            port_vulns.append({
+                "id": f"PORT-{f['port']}",
+                "file": f.get("file", f"{f['service']}:{f['port']}"),
+                "line": 0,
+                "severity": f["severity"],
+                "category": f.get("owasp_category", "A05:2021-Security Misconfiguration"),
+                "description": f["description"],
+                "cve": f["cves"][0] if f.get("cves") else None,
+                "cwes": f.get("cwes", []),
+                "all_cves": f.get("cves", []),
+                "port": f["port"],
+                "service": f["service"],
+                "banner": f.get("banner", "—"),
+                "recommendation": f.get("recommendation", ""),
+            })
+
+    # Static analysis / HTTP findings go through the LLM
+    other_findings = [f for f in state["raw_findings"] if f.get("type") != "port_exposure"]
+    findings_json = json.dumps(other_findings[:25], indent=2)  # cap for token budget
     owasp_ref = get_owasp_context()
 
     response = get_llm().invoke([
@@ -223,7 +268,8 @@ Output only a valid JSON array. No markdown."""),
         HumanMessage(content=f"Analyze these raw findings:\n{findings_json}"),
     ])
 
-    vulns = _parse_json(response.content, [])
+    llm_vulns = _parse_json(response.content, [])
+    vulns = port_vulns + llm_vulns
 
     severity_counts: dict[str, int] = {}
     for v in vulns:
@@ -232,14 +278,18 @@ Output only a valid JSON array. No markdown."""),
 
     owasp_cats = list({v.get("category", "").split("-")[0] for v in vulns if v.get("category")})
 
+    logs = [
+        f"[VulnAnalyzer] Mapped {len(vulns)} structured vulnerabilities",
+        f"[VulnAnalyzer] Severity breakdown: {severity_counts}",
+        f"[VulnAnalyzer] OWASP categories identified: {', '.join(sorted(owasp_cats)) or 'none'}",
+    ]
+    if port_vulns:
+        logs.append(f"[VulnAnalyzer] Port exposures: {len(port_vulns)} open ports mapped to CVEs/CWEs")
+
     return {
         "vulnerabilities": vulns,
         "status": "exploiting",
-        "agent_logs": [
-            f"[VulnAnalyzer] Mapped {len(vulns)} structured vulnerabilities",
-            f"[VulnAnalyzer] Severity breakdown: {severity_counts}",
-            f"[VulnAnalyzer] OWASP categories identified: {', '.join(sorted(owasp_cats)) or 'none'}",
-        ],
+        "agent_logs": logs,
     }
 
 
