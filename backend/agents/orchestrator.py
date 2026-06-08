@@ -177,7 +177,8 @@ def _scan_website(state: ScanState) -> dict:
 
         # Port scan
         host = urlparse(state["repo_url"]).hostname or state["repo_url"]
-        logs.append(f"[Scanner] Starting port scan on {host} ({len(__import__('tools.port_scanner', fromlist=['COMMON_PORTS']).COMMON_PORTS)} common ports)…")
+        from tools.port_scanner import COMMON_PORTS as _CP
+        logs.append(f"[Scanner] Starting port scan on {host} ({len(_CP)} common ports)…")
         port_findings = scan_ports(host)
 
         open_ports = [p for p in port_findings if "port" in p]
