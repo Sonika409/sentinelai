@@ -62,9 +62,12 @@ def _log(msg: str) -> list[str]:
 
 def orchestrator_node(state: ScanState) -> dict:
     """Uses LLM to plan the scan strategy before handing off to the scanner."""
+    from tools.website_scanner import is_github_url
+    scan_type = "github" if is_github_url(state["repo_url"]) else "website"
+
     response = get_llm().invoke([
         SystemMessage(content="""You are a security orchestrator agent.
-Given a repository URL, output a JSON scan plan:
+Given a target URL (GitHub repo or live website), output a JSON scan plan:
 {
   "strategy": "brief description of approach",
   "priority_areas": ["list", "of", "focus", "areas"],
@@ -75,15 +78,17 @@ Output only valid JSON. No markdown."""),
     ])
 
     plan = _parse_json(response.content, {
-        "strategy": "standard full-repo scan",
+        "strategy": "standard security scan",
         "priority_areas": ["authentication", "input validation", "dependencies"],
         "risk_level": "MEDIUM",
     })
 
+    scan_label = "GitHub repository" if scan_type == "github" else "live website"
     return {
         "status": "scanning",
         "agent_logs": [
-            f"[Orchestrator] Scan {state['scan_id']} started for {state['repo_url']}",
+            f"[Orchestrator] Scan {state['scan_id']} started — target: {state['repo_url']}",
+            f"[Orchestrator] Scan type: {scan_label}",
             f"[Orchestrator] Strategy: {plan['strategy']}",
             f"[Orchestrator] Priority areas: {', '.join(plan['priority_areas'])}",
             f"[Orchestrator] Estimated risk level: {plan['risk_level']}",
@@ -96,7 +101,16 @@ Output only valid JSON. No markdown."""),
 # ══════════════════════════════════════════════════════════════
 
 def scanner_node(state: ScanState) -> dict:
-    """Clones the repo and runs Semgrep + Bandit static analysis."""
+    """Routes to repo scanner (Semgrep + Bandit) or website scanner based on URL."""
+    from tools.website_scanner import is_github_url, scan_website
+
+    if is_github_url(state["repo_url"]):
+        return _scan_github(state)
+    return _scan_website(state)
+
+
+def _scan_github(state: ScanState) -> dict:
+    """Clone repo and run Semgrep + Bandit static analysis."""
     from tools.git_cloner import clone_repo, detect_tech_stack
     from tools.bandit_runner import run_bandit
     from tools.semgrep_runner import run_semgrep
@@ -105,6 +119,7 @@ def scanner_node(state: ScanState) -> dict:
         repo_path = clone_repo(state["repo_url"], state["scan_id"])
         tech_stack = detect_tech_stack(repo_path)
         logs = [
+            f"[Scanner] Mode: GitHub repository",
             f"[Scanner] Cloned to {repo_path}",
             f"[Scanner] Languages: {', '.join(tech_stack.get('languages', ['unknown']))}",
             f"[Scanner] Dependencies: {len(tech_stack.get('dependencies', []))} found",
@@ -131,7 +146,43 @@ def scanner_node(state: ScanState) -> dict:
         }
 
     except Exception as exc:
-        logger.exception("Scanner failed")
+        logger.exception("GitHub scanner failed")
+        return {
+            "errors": [f"Scanner error: {exc}"],
+            "status": "error",
+            "agent_logs": [f"[Scanner] ERROR: {exc}"],
+        }
+
+
+def _scan_website(state: ScanState) -> dict:
+    """Run HTTP-based security checks against a live website."""
+    from tools.website_scanner import scan_website
+
+    try:
+        logs = [
+            f"[Scanner] Mode: Live website",
+            f"[Scanner] Checking security headers, SSL, exposed files, CORS, cookies…",
+        ]
+        raw_findings = scan_website(state["repo_url"])
+
+        by_sev: dict[str, int] = {}
+        for f in raw_findings:
+            s = f.get("severity", "?")
+            by_sev[s] = by_sev.get(s, 0) + 1
+
+        logs.append(f"[Scanner] HTTP checks complete — {len(raw_findings)} raw findings")
+        logs.append(f"[Scanner] Severity breakdown: {by_sev}")
+
+        return {
+            "repo_path": "",
+            "tech_stack": {"type": "website", "url": state["repo_url"]},
+            "raw_findings": raw_findings,
+            "status": "analyzing",
+            "agent_logs": logs,
+        }
+
+    except Exception as exc:
+        logger.exception("Website scanner failed")
         return {
             "errors": [f"Scanner error: {exc}"],
             "status": "error",
