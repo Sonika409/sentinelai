@@ -20,24 +20,33 @@ A proctoring system that monitors online exams in real time using tab-switch det
 
 > 📹 **Demo video:** *(add link after recording)*
 
-### Screenshots
-
-**Home — module selector**
+**Home — SentinelAI module selector**
 ![SentinelAI Home](docs/screenshots/home2.png)
 
-**VulnSentinel — scan input (auto-detects GitHub repo or website)**
+---
+
+## 🔍 VulnSentinel — Screenshots
+
+**Scan input page — auto-detects GitHub repo or live website URL**
 ![VulnSentinel Scan Input](docs/screenshots/vulnsentinel-scan-input.png)
 
-**VulnSentinel — live agent feed + findings dashboard**
+**Live agent feed — website scan of Pushpenderrathore.github.io**
+![VulnSentinel GitHub.io Scan](docs/screenshots/vulnsentinel-github-scan.png)
+
+**Live agent feed + findings dashboard — example.com website scan**
 ![VulnSentinel Live Results](docs/screenshots/vulnsentinel-live-results.png)
 
-**ExamGuard — create a monitored exam session**
+---
+
+## 🎓 ExamGuard — Screenshots
+
+**Create a monitored exam session**
 ![ExamGuard Create Session](docs/screenshots/examguard-create.png)
 
-**ExamGuard — student exam view (live webcam + timer + Monitored badge)**
+**Student exam view — live webcam, timer, and Monitored badge**
 ![ExamGuard Student View](docs/screenshots/examguard-student.png)
 
-**ExamGuard — exam submitted (AI integrity report sent to invigilator)**
+**Exam submitted — AI integrity report generated for invigilator**
 ![ExamGuard Submitted](docs/screenshots/examguard-submitted.png)
 
 ---
