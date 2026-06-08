@@ -23,13 +23,22 @@ A proctoring system that monitors online exams in real time using tab-switch det
 ### Screenshots
 
 **Home — module selector**
-![SentinelAI Home](docs/screenshots/home.png)
+![SentinelAI Home](docs/screenshots/home2.png)
 
 **VulnSentinel — scan input (auto-detects GitHub repo or website)**
 ![VulnSentinel Scan Input](docs/screenshots/vulnsentinel-scan-input.png)
 
 **VulnSentinel — live agent feed + findings dashboard**
 ![VulnSentinel Live Results](docs/screenshots/vulnsentinel-live-results.png)
+
+**ExamGuard — create a monitored exam session**
+![ExamGuard Create Session](docs/screenshots/examguard-create.png)
+
+**ExamGuard — student exam view (live webcam + timer + Monitored badge)**
+![ExamGuard Student View](docs/screenshots/examguard-student.png)
+
+**ExamGuard — exam submitted (AI integrity report sent to invigilator)**
+![ExamGuard Submitted](docs/screenshots/examguard-submitted.png)
 
 ---
 
