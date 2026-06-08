@@ -8,6 +8,34 @@ SentinelAI is a multi-agent AI platform that detects threats autonomously — in
 
 ---
 
+## Table of Contents
+
+- [Modules](#modules)
+- [Demo](#demo)
+- [VulnSentinel — Screenshots](#-vulnsentinel--screenshots)
+- [ExamGuard — Screenshots](#-examguard--screenshots)
+- [Sample Scan Results](#vulnsentinel--dual-scan-mode)
+- [Architecture](#architecture)
+- [Tech Stack](#tech-stack)
+- [Project Structure](#project-structure)
+- [Setup & Run](#setup--run)
+  - [Prerequisites](#prerequisites)
+  - [Backend](#1--backend)
+  - [Offline / Ollama fallback](#offline--ollama-fallback-optional)
+  - [Frontend](#2--frontend)
+- [How It Works](#how-it-works)
+  - [VulnSentinel — 6-Agent Pipeline](#vulnsentinel--6-agent-pipeline-github--website)
+  - [Website Scanner Checks](#website-scanner-checks)
+  - [Port Scanner — CVE/CWE Mapping](#port-scanner--cvecwe-mapping)
+  - [ExamGuard — Two-Phase System](#examguard--two-phase-system)
+  - [Real-time Alert Thresholds](#real-time-alert-thresholds-examguard)
+- [WebSocket Message Protocol](#websocket-message-protocol)
+- [API Reference](#api-reference)
+- [Team](#team)
+- [License](#license)
+
+---
+
 ## Modules
 
 ### 🔍 VulnSentinel — Autonomous Code & Website Security Auditor
@@ -172,16 +200,13 @@ sentinelai/
 ├── backend/
 │   ├── main.py                     # FastAPI app — all routes & WebSocket endpoints
 │   ├── agents/
+│   │   ├── llm_router.py           # Groq-first LLM router with Ollama offline fallback
 │   │   ├── state.py                # ScanState TypedDict
 │   │   └── orchestrator.py         # VulnSentinel 6-node LangGraph graph
 │   ├── exam_agents/
 │   │   ├── exam_state.py           # ExamSession TypedDict
 │   │   ├── exam_pipeline.py        # ExamGuard 5-node LangGraph graph
 │   │   └── event_rules.py          # Rule-based instant alert thresholds
-│   ├── agents/
-│   │   ├── llm_router.py           # Groq-first LLM router with Ollama offline fallback
-│   │   ├── state.py                # ScanState TypedDict
-│   │   └── orchestrator.py         # VulnSentinel 6-node LangGraph graph
 │   ├── tools/
 │   │   ├── git_cloner.py           # Repo clone + tech stack detection
 │   │   ├── bandit_runner.py        # Python static analysis
@@ -335,6 +360,25 @@ User pastes GitHub repo URL or website URL
 | Dangerous methods | TRACE, PUT, DELETE enabled |
 | Sensitive file exposure | `/.env`, `/.git/config`, `/wp-config.php`, `/phpinfo.php`, `/phpmyadmin`, backup SQL files, Swagger UI |
 | Info disclosure | `Server` and `X-Powered-By` headers revealing stack details |
+
+### Port Scanner — CVE/CWE Mapping
+
+When a website URL is scanned, VulnSentinel also performs a parallel port scan across 25 common ports. Each open port is matched against a built-in risk database — no external API calls needed.
+
+| Port | Service | Severity | Key CVEs |
+|------|---------|----------|---------|
+| 445 | SMB | CRITICAL | CVE-2017-0144 EternalBlue, CVE-2020-0796 SMBGhost |
+| 3389 | RDP | CRITICAL | CVE-2019-0708 BlueKeep, CVE-2019-1182 DejaBlue |
+| 6379 | Redis | CRITICAL | CVE-2022-0543 Lua RCE — no auth by default |
+| 9200 | Elasticsearch | CRITICAL | CVE-2014-3120 RCE — no auth by default |
+| 27017 | MongoDB | CRITICAL | CVE-2013-4650 — no auth by default |
+| 3306 | MySQL | CRITICAL | CVE-2012-2122 auth bypass |
+| 5432 | PostgreSQL | CRITICAL | CVE-2019-9193 RCE via COPY |
+| 23 | Telnet | CRITICAL | Cleartext credentials (CWE-319) |
+| 21 | FTP | HIGH | CVE-2010-4221, cleartext transfer |
+| 22 | SSH | MEDIUM | CVE-2024-6387 regreSSHion |
+
+Each open port appears as a VulnCard in the findings panel showing: port badge, all CVEs, CWE chips, and a fix recommendation.
 
 ### ExamGuard — Two-Phase System
 
