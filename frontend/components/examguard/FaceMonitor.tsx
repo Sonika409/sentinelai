@@ -7,13 +7,41 @@ interface Props {
   active: boolean
 }
 
-export default function FaceMonitor({ onFaceEvent, active }: Props) {
-  const videoRef  = useRef<HTMLVideoElement>(null)
-  const [camError, setCamError] = useState<string | null>(null)
-  const [streaming, setStreaming] = useState(false)
+type ModelStatus = "loading" | "ready" | "error"
 
+export default function FaceMonitor({ onFaceEvent, active }: Props) {
+  const videoRef    = useRef<HTMLVideoElement>(null)
+  const canvasRef   = useRef<HTMLCanvasElement>(null)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const [camError,     setCamError]     = useState<string | null>(null)
+  const [streaming,    setStreaming]     = useState(false)
+  const [modelStatus,  setModelStatus]  = useState<ModelStatus>("loading")
+  const [faceCount,    setFaceCount]    = useState<number | null>(null)
+
+  // Load face-api models once
   useEffect(() => {
     if (!active) return
+    let cancelled = false
+
+    async function loadModels() {
+      try {
+        const faceapi = await import("@vladmandic/face-api")
+        await faceapi.nets.tinyFaceDetector.loadFromUri("/models")
+        if (!cancelled) setModelStatus("ready")
+      } catch (e) {
+        console.error("face-api model load failed:", e)
+        if (!cancelled) setModelStatus("error")
+      }
+    }
+
+    loadModels()
+    return () => { cancelled = true }
+  }, [active])
+
+  // Start webcam once model is ready
+  useEffect(() => {
+    if (!active || modelStatus !== "ready") return
     let stream: MediaStream | null = null
 
     navigator.mediaDevices
@@ -28,19 +56,70 @@ export default function FaceMonitor({ onFaceEvent, active }: Props) {
       })
       .catch(() => setCamError("Camera access denied"))
 
-    // Send a face event every 3 s (replace with real face-api.js inference)
-    const interval = setInterval(() => {
-      // Placeholder: always reports 1 face with high confidence
-      // Swap this with actual face-api.js detection result
-      onFaceEvent(1, 0.97)
-    }, 3000)
-
     return () => {
-      clearInterval(interval)
       stream?.getTracks().forEach((t) => t.stop())
       setStreaming(false)
     }
-  }, [active, onFaceEvent])
+  }, [active, modelStatus])
+
+  // Run detection every 3 s once streaming
+  useEffect(() => {
+    if (!streaming || modelStatus !== "ready") return
+
+    async function detect() {
+      if (!videoRef.current) return
+      try {
+        const faceapi = await import("@vladmandic/face-api")
+        const detections = await faceapi.detectAllFaces(
+          videoRef.current,
+          new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.4 })
+        )
+
+        const count = detections.length
+        const bestScore = count > 0
+          ? Math.max(...detections.map((d) => d.score))
+          : 0
+
+        setFaceCount(count)
+        onFaceEvent(count, parseFloat(bestScore.toFixed(2)))
+
+        // Draw bounding boxes on overlay canvas
+        if (canvasRef.current && videoRef.current) {
+          const dims = {
+            width:  videoRef.current.videoWidth  || 320,
+            height: videoRef.current.videoHeight || 240,
+          }
+          faceapi.matchDimensions(canvasRef.current, dims)
+          const resized = faceapi.resizeResults(detections, dims)
+          const ctx = canvasRef.current.getContext("2d")
+          if (ctx) {
+            ctx.clearRect(0, 0, dims.width, dims.height)
+            resized.forEach((d) => {
+              const { x, y, width, height } = d.box
+              const color = count === 1 ? "#22d3ee" : count === 0 ? "#f87171" : "#fb923c"
+              ctx.strokeStyle = color
+              ctx.lineWidth   = 2
+              ctx.strokeRect(x, y, width, height)
+              ctx.fillStyle = color
+              ctx.font = "11px monospace"
+              ctx.fillText(`${(d.score * 100).toFixed(0)}%`, x + 4, y - 4)
+            })
+          }
+        }
+      } catch (e) {
+        console.warn("Detection frame failed:", e)
+      }
+    }
+
+    intervalRef.current = setInterval(detect, 3000)
+    detect() // run immediately on start
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+    }
+  }, [streaming, modelStatus, onFaceEvent])
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   if (camError) {
     return (
@@ -53,28 +132,65 @@ export default function FaceMonitor({ onFaceEvent, active }: Props) {
     )
   }
 
+  const faceStatusColor =
+    faceCount === null ? "text-sentinel-muted" :
+    faceCount === 1    ? "text-sentinel-green"  :
+    faceCount === 0    ? "text-sentinel-red"    : "text-orange-400"
+
+  const faceStatusText =
+    faceCount === null ? "—" :
+    faceCount === 0    ? "No face" :
+    faceCount === 1    ? "1 face ✓" : `${faceCount} faces ⚠`
+
   return (
-    <div className="relative aspect-video rounded-xl overflow-hidden bg-black border border-sentinel-border">
-      <video
-        ref={videoRef}
-        muted
-        playsInline
-        className="w-full h-full object-cover scale-x-[-1]"
-      />
-      {!streaming && (
-        <div className="absolute inset-0 flex items-center justify-center bg-sentinel-surface">
-          <svg className="w-6 h-6 animate-spin text-sentinel-muted" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-          </svg>
-        </div>
-      )}
-      {streaming && (
-        <div className="absolute top-2 right-2 flex items-center gap-1.5 bg-black/60 rounded-full px-2 py-1">
-          <span className="w-1.5 h-1.5 rounded-full bg-sentinel-green animate-pulse" />
-          <span className="text-[10px] font-mono text-sentinel-green">LIVE</span>
-        </div>
-      )}
+    <div className="space-y-1">
+      <div className="relative aspect-video rounded-xl overflow-hidden bg-black border border-sentinel-border">
+        {/* Webcam feed (mirrored) */}
+        <video
+          ref={videoRef}
+          muted
+          playsInline
+          className="w-full h-full object-cover scale-x-[-1]"
+        />
+
+        {/* Detection overlay canvas (mirrored to match video) */}
+        <canvas
+          ref={canvasRef}
+          className="absolute inset-0 w-full h-full scale-x-[-1] pointer-events-none"
+        />
+
+        {/* Status overlays */}
+        {!streaming && modelStatus === "loading" && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-sentinel-surface">
+            <svg className="w-5 h-5 animate-spin text-sentinel-muted" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            </svg>
+            <p className="text-xs text-sentinel-muted font-mono">Loading AI model…</p>
+          </div>
+        )}
+
+        {modelStatus === "error" && (
+          <div className="absolute inset-0 flex items-center justify-center bg-sentinel-surface">
+            <p className="text-xs text-sentinel-red font-mono">Face model failed to load</p>
+          </div>
+        )}
+
+        {/* LIVE badge */}
+        {streaming && (
+          <div className="absolute top-2 right-2 flex items-center gap-1.5 bg-black/60 rounded-full px-2 py-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-sentinel-green animate-pulse" />
+            <span className="text-[10px] font-mono text-sentinel-green">LIVE</span>
+          </div>
+        )}
+
+        {/* Face count badge */}
+        {streaming && faceCount !== null && (
+          <div className="absolute bottom-2 left-2 bg-black/60 rounded-full px-2 py-1">
+            <span className={`text-[10px] font-mono ${faceStatusColor}`}>{faceStatusText}</span>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
