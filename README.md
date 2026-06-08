@@ -144,7 +144,7 @@ Integrity Score: 58/100 · Verdict: FLAGGED 🚨
 │  │ → fix_suggester          │                                    │
 │  │ → report_generator       │                                    │
 │  └──────────────────────────┘                                    │
-│         Powered by Groq · Llama 3.3 70B (llama-3.3-70b-versatile)         │
+│  LLM: Groq (primary) → Ollama offline fallback (auto-switch)               │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -155,10 +155,11 @@ Integrity Score: 58/100 · Verdict: FLAGGED 🚨
 | Layer | Technology |
 |-------|-----------|
 | Agent framework | [LangGraph](https://github.com/langchain-ai/langgraph) |
-| LLM | Llama 3.3 70B via [Groq](https://console.groq.com) (free tier) |
+| LLM (primary) | Llama 3.3 70B via [Groq](https://console.groq.com) (free tier, cloud) |
+| LLM (offline fallback) | Any local model via [Ollama](https://ollama.com) — auto-switches on rate-limit |
 | Backend | Python 3.11 · FastAPI · WebSockets |
 | Repo scanning | Semgrep · Bandit (static analysis) |
-| Website scanning | HTTP headers · SSL · CORS · cookie · file exposure checks |
+| Website scanning | HTTP headers · SSL · CORS · cookie · file exposure · port scan (CVE/CWE) |
 | Frontend | Next.js 14 · TypeScript · Tailwind CSS |
 | Real-time | Native WebSocket (browser ↔ server) |
 
@@ -177,11 +178,17 @@ sentinelai/
 │   │   ├── exam_state.py           # ExamSession TypedDict
 │   │   ├── exam_pipeline.py        # ExamGuard 5-node LangGraph graph
 │   │   └── event_rules.py          # Rule-based instant alert thresholds
+│   ├── agents/
+│   │   ├── llm_router.py           # Groq-first LLM router with Ollama offline fallback
+│   │   ├── state.py                # ScanState TypedDict
+│   │   └── orchestrator.py         # VulnSentinel 6-node LangGraph graph
 │   ├── tools/
 │   │   ├── git_cloner.py           # Repo clone + tech stack detection
 │   │   ├── bandit_runner.py        # Python static analysis
 │   │   ├── semgrep_runner.py       # Multi-language static analysis
-│   │   └── website_scanner.py      # HTTP security checks (headers, SSL, cookies, exposed files)
+│   │   ├── website_scanner.py      # HTTP security checks (headers, SSL, cookies, exposed files)
+│   │   ├── port_scanner.py         # Port scan — 25 ports, CVE/CWE risk mapping
+│   │   └── owasp_data.py           # OWASP Top 10 2021 knowledge base
 │   └── requirements.txt
 └── frontend/
     ├── app/
@@ -216,6 +223,7 @@ sentinelai/
 - [Semgrep](https://semgrep.dev/docs/getting-started/) — `pip install semgrep`
 - [Bandit](https://bandit.readthedocs.io/) — `pip install bandit`
 - Groq API key (free) → [console.groq.com](https://console.groq.com)
+- (Optional) [Ollama](https://ollama.com/download) for offline/fallback mode
 
 ### 1 — Backend
 
@@ -224,7 +232,7 @@ cd backend
 
 # Configure environment
 cp .env.example .env
-# Edit .env and set GROQ_API_KEY=gsk_...   (free at console.groq.com)
+# Edit .env — set GROQ_API_KEY=gsk_...  (free at console.groq.com)
 
 # Install dependencies
 python -m venv .venv && source .venv/bin/activate
@@ -235,6 +243,43 @@ bash run.sh
 # → http://localhost:8000
 # → http://localhost:8000/docs  (Swagger UI)
 ```
+
+### Offline / Ollama fallback (optional)
+
+SentinelAI works fully offline using a local Ollama model. No internet or API key required.
+
+```bash
+# 1 — Install Ollama
+#     macOS:   brew install ollama
+#     Linux:   curl -fsSL https://ollama.com/install.sh | sh
+#     Windows: download from https://ollama.com/download
+
+# 2 — Pull a model (one-time download)
+ollama pull llama3          # 4.7 GB — recommended
+# ollama pull mistral       # 4.4 GB — good alternative
+# ollama pull phi3          # 2.3 GB — lighter, faster
+
+# 3 — Ollama runs as a background service on port 11434 automatically
+#     No extra config needed — SentinelAI detects it automatically.
+```
+
+Add to `backend/.env` if you want to customise the model:
+
+```env
+OLLAMA_MODEL=llama3
+OLLAMA_BASE_URL=http://localhost:11434
+```
+
+**How the fallback works:**
+
+| Situation | Active LLM | Agent feed shows |
+|-----------|-----------|-----------------|
+| Groq working normally | Groq · Llama 3.3 70B | `LLM: Groq / llama-3.3-70b-versatile` |
+| Groq rate-limited (429) | Ollama · llama3 | `LLM: Ollama / llama3 (offline)` |
+| No internet at all | Ollama · llama3 | `LLM: Ollama / llama3 (offline)` |
+| Groq recovers after 30 min | Groq (auto-retry) | `LLM: Groq / llama-3.3-70b-versatile` |
+
+The switch is automatic — no restart needed. The active model is logged in the agent feed at the start of every scan.
 
 ### 2 — Frontend
 
