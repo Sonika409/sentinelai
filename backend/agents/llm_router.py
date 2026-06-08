@@ -53,11 +53,17 @@ def _build_ollama():
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _is_groq_error(exc: Exception) -> bool:
+    """Return True only for errors that justify switching to Ollama.
+    Auth errors (401 invalid key) are config issues — let them propagate."""
+    exc_type = type(exc).__name__.lower()
     msg = str(exc).lower()
-    return any(k in msg for k in (
-        "rate_limit", "429", "token", "quota", "exceeded",
-        "connectionerror", "connection error", "connection refused",
-        "network", "timeout", "unreachable",
+    # Never swallow auth errors — wrong key is a config problem, not an outage
+    if "authentication" in exc_type or "invalid_api_key" in msg or "401" in msg:
+        return False
+    return any(k in msg or k in exc_type for k in (
+        "rate_limit", "ratelimit", "429", "token", "quota", "exceeded",
+        "connectionerror", "connection_error", "connection refused",
+        "network", "timeout", "unreachable", "503", "service_unavailable",
     ))
 
 
