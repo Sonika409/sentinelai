@@ -2,6 +2,8 @@
 
 > **FAR AWAY 2026 · Team Zen Hackers · Theme: Agentic & Autonomous Systems**
 
+![FAR AWAY 2026 — India's Biggest International Hackathon](docs/screenshots/faraway-theme.png)
+
 SentinelAI is a multi-agent AI platform that detects threats autonomously — in **source code** and in **online exams** — without requiring human intervention. Two real-world problems. One agentic engine.
 
 ---
