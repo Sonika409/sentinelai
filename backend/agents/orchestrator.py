@@ -196,13 +196,19 @@ def _scan_website(state: ScanState) -> dict:
 
 def vuln_analyzer_node(state: ScanState) -> dict:
     """Maps raw static-analysis findings to structured Vulnerability objects."""
+    from tools.owasp_data import get_owasp_context
     findings_json = json.dumps(state["raw_findings"][:25], indent=2)  # cap for token budget
+    owasp_ref = get_owasp_context()
 
     response = get_llm().invoke([
-        SystemMessage(content="""You are a vulnerability analysis agent.
+        SystemMessage(content=f"""You are a vulnerability analysis agent.
 Map raw static analysis findings to structured vulnerability objects.
+Use the OWASP reference below to assign the correct category and severity.
+
+{owasp_ref}
+
 Return a JSON array. Each object must have:
-{
+{{
   "id": "VULN-001",
   "file": "relative/path/to/file.py",
   "line": 42,
@@ -210,7 +216,9 @@ Return a JSON array. Each object must have:
   "category": "OWASP label e.g. A03:2021-Injection",
   "description": "clear one-sentence description",
   "cve": "CVE-XXXX-XXXX or null"
-}
+}}
+Severity guide: CRITICAL = direct RCE/SQLi/auth bypass, HIGH = exploitable with low effort,
+MEDIUM = exploitable with moderate effort or requires chaining, LOW = hardening/best-practice.
 Output only a valid JSON array. No markdown."""),
         HumanMessage(content=f"Analyze these raw findings:\n{findings_json}"),
     ])
@@ -222,12 +230,15 @@ Output only a valid JSON array. No markdown."""),
         sev = v.get("severity", "UNKNOWN")
         severity_counts[sev] = severity_counts.get(sev, 0) + 1
 
+    owasp_cats = list({v.get("category", "").split("-")[0] for v in vulns if v.get("category")})
+
     return {
         "vulnerabilities": vulns,
         "status": "exploiting",
         "agent_logs": [
             f"[VulnAnalyzer] Mapped {len(vulns)} structured vulnerabilities",
             f"[VulnAnalyzer] Severity breakdown: {severity_counts}",
+            f"[VulnAnalyzer] OWASP categories identified: {', '.join(sorted(owasp_cats)) or 'none'}",
         ],
     }
 
@@ -247,17 +258,24 @@ def exploit_reasoner_node(state: ScanState) -> dict:
             "agent_logs": ["[ExploitReasoner] No HIGH/CRITICAL findings — skipping."],
         }
 
+    from tools.owasp_data import get_owasp_context
+    owasp_ref = get_owasp_context()
+
     response = get_llm().invoke([
-        SystemMessage(content="""You are an exploit reasoning agent.
-For each vulnerability explain how an attacker would exploit it.
+        SystemMessage(content=f"""You are an exploit reasoning agent.
+For each vulnerability explain how a real-world attacker would exploit it.
+Use the OWASP reference to inform the attack vector and realistic impact.
+
+{owasp_ref}
+
 Return a JSON array. Each object must have:
-{
+{{
   "vuln_id": "VULN-001",
   "exploitability": "EASY|MODERATE|HARD",
-  "attack_vector": "e.g. unauthenticated POST /api/login",
-  "impact": "e.g. full database dump",
+  "attack_vector": "e.g. unauthenticated POST /api/login with payload",
+  "impact": "e.g. full database dump, RCE, account takeover",
   "poc_description": "step-by-step attack walkthrough"
-}
+}}
 Output only a valid JSON array. Be specific and technical. No markdown."""),
         HumanMessage(content=f"Reason about exploitability:\n{json.dumps(targets, indent=2)}"),
     ])
