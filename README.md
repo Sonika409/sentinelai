@@ -8,8 +8,8 @@ SentinelAI is a multi-agent AI platform that detects threats autonomously — in
 
 ## Modules
 
-### 🔍 VulnSentinel — Autonomous Code Security Auditor
-Paste any public GitHub URL. A pipeline of five specialised AI agents clones the repository, runs static analysis, maps findings to OWASP Top 10 and CVEs, reasons about real-world exploitability, generates code patches, and produces a full security report — all without a human in the loop.
+### 🔍 VulnSentinel — Autonomous Code & Website Security Auditor
+Paste a **GitHub repository URL** or any **live website URL**. VulnSentinel auto-detects the target type and routes to the right scanner — static analysis for repos, HTTP security checks for websites. Five specialised AI agents then map findings to OWASP Top 10 and CVEs, reason about real-world exploitability, generate patches or remediation guidance, and produce a full security report — all without a human in the loop.
 
 ### 🎓 ExamGuard — AI-Powered Exam Integrity Monitor
 A proctoring system that monitors online exams in real time using tab-switch detection, webcam face analysis, and keystroke dynamics. Immediate rule-based alerts fire the moment suspicious behaviour is detected. When the exam ends, a second agent pipeline performs deep behavioural analysis and generates an integrity report with a verdict.
@@ -20,7 +20,9 @@ A proctoring system that monitors online exams in real time using tab-switch det
 
 > 📹 **Demo video:** *(add link after recording)*
 
-### VulnSentinel — 18 vulnerabilities found in OWASP Mutillidae
+### VulnSentinel — Dual scan mode
+
+#### GitHub Repo Scan — OWASP Mutillidae (18 vulnerabilities)
 
 ```
 Risk Score: 85/100 · Overall Risk: CRITICAL
@@ -34,6 +36,24 @@ CRITICAL  12   HIGH  4   MEDIUM  2   LOW  0
 [HIGH]     A03 Injection  — shell_exec() with unsanitised $domain in dns-lookup.php:165
 [HIGH]     A05 Sec Misc   — SSL verification disabled in RemoteFileHandler.php:62
 ... + 12 more  · 16 auto-generated patches
+```
+
+#### Website Scan — brcmcet.edu.in (8 vulnerabilities)
+
+```
+Risk Score: 60/100 · Overall Risk: MEDIUM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CRITICAL   0   HIGH  2   MEDIUM  3   LOW  3
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[HIGH]   A02 Cryptographic Failures    — Missing Strict-Transport-Security header
+[HIGH]   A05 Security Misconfiguration — Missing Content-Security-Policy header
+[MEDIUM] A05 Security Misconfiguration — Missing X-Frame-Options (clickjacking risk)
+[MEDIUM] A05 Security Misconfiguration — Missing X-Content-Type-Options header
+[MEDIUM] A05 Security Misconfiguration — PHPSESSID cookie missing Secure & HttpOnly flags
+[LOW]    A05 Security Misconfiguration — Missing Referrer-Policy header
+[LOW]    A05 Security Misconfiguration — Missing Permissions-Policy header
+[LOW]    A05 Security Misconfiguration — Server header discloses Apache version
+· 5 auto-generated remediation patches
 ```
 
 ### ExamGuard — Real-time proctoring demo
@@ -72,15 +92,19 @@ Integrity Score: 58/100 · Verdict: FLAGGED 🚨
 ├──────────────────────────┴──────────────────────────────────────┤
 │              LangGraph Agent Pipelines                           │
 │                                                                  │
-│  VulnSentinel                    ExamGuard                       │
-│  ┌─────────────────────┐         ┌─────────────────────┐        │
-│  │ orchestrator        │         │ session_monitor      │        │
-│  │ → scanner           │         │ → behavior_analyzer  │        │
-│  │ → vuln_analyzer     │         │ → anomaly_scorer     │        │
-│  │ → exploit_reasoner  │         │ → alert_generator    │        │
-│  │ → fix_suggester     │         │ → report_generator   │        │
-│  │ → report_generator  │         └─────────────────────┘        │
-│  └─────────────────────┘                                         │
+│  VulnSentinel                         ExamGuard                  │
+│  ┌──────────────────────────┐         ┌─────────────────────┐   │
+│  │ orchestrator             │         │ session_monitor      │   │
+│  │ → scanner ─┬─ GitHub     │         │ → behavior_analyzer  │   │
+│  │            │  (Semgrep+  │         │ → anomaly_scorer     │   │
+│  │            │   Bandit)   │         │ → alert_generator    │   │
+│  │            └─ Website    │         │ → report_generator   │   │
+│  │               (HTTP scan)│         └─────────────────────┘   │
+│  │ → vuln_analyzer          │                                    │
+│  │ → exploit_reasoner       │                                    │
+│  │ → fix_suggester          │                                    │
+│  │ → report_generator       │                                    │
+│  └──────────────────────────┘                                    │
 │         Powered by Groq · Llama 3.3 70B (llama-3.3-70b-versatile)         │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -94,7 +118,8 @@ Integrity Score: 58/100 · Verdict: FLAGGED 🚨
 | Agent framework | [LangGraph](https://github.com/langchain-ai/langgraph) |
 | LLM | Llama 3.3 70B via [Groq](https://console.groq.com) (free tier) |
 | Backend | Python 3.11 · FastAPI · WebSockets |
-| Static analysis | Semgrep · Bandit |
+| Repo scanning | Semgrep · Bandit (static analysis) |
+| Website scanning | HTTP headers · SSL · CORS · cookie · file exposure checks |
 | Frontend | Next.js 14 · TypeScript · Tailwind CSS |
 | Real-time | Native WebSocket (browser ↔ server) |
 
@@ -116,7 +141,8 @@ sentinelai/
 │   ├── tools/
 │   │   ├── git_cloner.py           # Repo clone + tech stack detection
 │   │   ├── bandit_runner.py        # Python static analysis
-│   │   └── semgrep_runner.py       # Multi-language static analysis
+│   │   ├── semgrep_runner.py       # Multi-language static analysis
+│   │   └── website_scanner.py      # HTTP security checks (headers, SSL, cookies, exposed files)
 │   └── requirements.txt
 └── frontend/
     ├── app/
@@ -184,25 +210,47 @@ npm run dev
 
 ## How It Works
 
-### VulnSentinel — 6-Agent Pipeline
+### VulnSentinel — 6-Agent Pipeline (GitHub + Website)
+
+VulnSentinel accepts two target types — auto-detected from the URL:
+
+| Target | Scanner used |
+|--------|-------------|
+| `github.com/owner/repo` | Clone → Semgrep + Bandit static analysis |
+| Any website URL | HTTP security checks (headers, SSL, cookies, exposed files, CORS) |
 
 ```
-User pastes GitHub URL
+User pastes GitHub repo URL or website URL
         │
-   [Orchestrator]  Plans scan strategy using LLM reasoning
+   [Orchestrator]  Auto-detects target type · plans scan strategy with LLM
         │
-   [Scanner]       Clones repo · detects tech stack · runs Semgrep + Bandit
+   [Scanner]       GitHub → clone + Semgrep + Bandit
+                   Website → security headers · SSL cert · cookie flags ·
+                             exposed files (/.env, /.git, /wp-config…) ·
+                             CORS · server info disclosure
         │
-   [Vuln Analyzer] Maps raw findings → structured vulnerabilities with OWASP + CVE context
+   [Vuln Analyzer]     Maps raw findings → structured vulnerabilities with OWASP + CVE context
         │
    [Exploit Reasoner]  Explains how each HIGH/CRITICAL vuln can be exploited in the real world
         │
-   [Fix Suggester]     Generates code patches for each vulnerability
+   [Fix Suggester]     Generates code patches or HTTP remediation config
         │
    [Report Generator]  Compiles executive summary · risk score · full JSON report
         │
    Results streamed live to the browser via WebSocket
 ```
+
+#### Website scanner checks
+
+| Check | What it finds |
+|-------|--------------|
+| Security headers | Missing CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy |
+| Transport security | HTTP instead of HTTPS · HSTS max-age too short · SSL cert expiry |
+| Cookie security | Missing `Secure`, `HttpOnly`, `SameSite` flags on session cookies |
+| CORS | Wildcard `Access-Control-Allow-Origin: *` |
+| Dangerous methods | TRACE, PUT, DELETE enabled |
+| Sensitive file exposure | `/.env`, `/.git/config`, `/wp-config.php`, `/phpinfo.php`, `/phpmyadmin`, backup SQL files, Swagger UI |
+| Info disclosure | `Server` and `X-Powered-By` headers revealing stack details |
 
 ### ExamGuard — Two-Phase System
 
