@@ -14,10 +14,17 @@ from pathlib import Path
 def clone_repo(repo_url: str, scan_id: str) -> str:
     dest = os.path.join(tempfile.gettempdir(), f"vulnsentinel_{scan_id}")
     subprocess.run(
-        ["git", "clone", "--depth", "1", repo_url, dest],
+        [
+            "git", "clone",
+            "--depth", "1",        # shallow — only latest commit
+            "--single-branch",     # skip all other branches
+            "--no-tags",           # skip tag objects
+            "--filter=blob:limit=2m",  # skip individual files > 2 MB
+            repo_url, dest,
+        ],
         check=True,
         capture_output=True,
-        timeout=60,
+        timeout=300,               # 5 minutes — enough for any large repo
     )
     return dest
 
