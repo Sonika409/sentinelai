@@ -17,22 +17,14 @@ import logging
 import uuid
 from typing import AsyncGenerator, Literal
 
-from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 
 from .state import ScanState
+from .llm_router import invoke_llm, active_model_label
 
 logger = logging.getLogger(__name__)
-
-_llm = None
-
-def get_llm():
-    global _llm
-    if _llm is None:
-        _llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
-    return _llm
 
 
 # ══════════════════════════════════════════════════════════════
@@ -65,7 +57,7 @@ def orchestrator_node(state: ScanState) -> dict:
     from tools.website_scanner import is_github_url
     scan_type = "github" if is_github_url(state["repo_url"]) else "website"
 
-    response = get_llm().invoke([
+    response = invoke_llm([
         SystemMessage(content="""You are a security orchestrator agent.
 Given a target URL (GitHub repo or live website), output a JSON scan plan:
 {
@@ -89,6 +81,7 @@ Output only valid JSON. No markdown."""),
         "agent_logs": [
             f"[Orchestrator] Scan {state['scan_id']} started — target: {state['repo_url']}",
             f"[Orchestrator] Scan type: {scan_label}",
+            f"[Orchestrator] LLM: {active_model_label()}",
             f"[Orchestrator] Strategy: {plan['strategy']}",
             f"[Orchestrator] Priority areas: {', '.join(plan['priority_areas'])}",
             f"[Orchestrator] Estimated risk level: {plan['risk_level']}",
@@ -246,7 +239,7 @@ def vuln_analyzer_node(state: ScanState) -> dict:
     findings_json = json.dumps(other_findings[:25], indent=2)  # cap for token budget
     owasp_ref = get_owasp_context()
 
-    response = get_llm().invoke([
+    response = invoke_llm([
         SystemMessage(content=f"""You are a vulnerability analysis agent.
 Map raw static analysis findings to structured vulnerability objects.
 Use the OWASP reference below to assign the correct category and severity.
@@ -312,7 +305,7 @@ def exploit_reasoner_node(state: ScanState) -> dict:
     from tools.owasp_data import get_owasp_context
     owasp_ref = get_owasp_context()
 
-    response = get_llm().invoke([
+    response = invoke_llm([
         SystemMessage(content=f"""You are an exploit reasoning agent.
 For each vulnerability explain how a real-world attacker would exploit it.
 Use the OWASP reference to inform the attack vector and realistic impact.
@@ -363,7 +356,7 @@ def fix_suggester_node(state: ScanState) -> dict:
     logs = []
 
     for vuln in targets:
-        response = get_llm().invoke([
+        response = invoke_llm([
             SystemMessage(content="""You are a secure code fix agent.
 Generate a targeted code patch for the vulnerability provided.
 Return a single JSON object:
@@ -403,7 +396,7 @@ def report_generator_node(state: ScanState) -> dict:
     critical = [v for v in state.get("vulnerabilities", []) if v["severity"] == "CRITICAL"]
     high = [v for v in state.get("vulnerabilities", []) if v["severity"] == "HIGH"]
 
-    response = get_llm().invoke([
+    response = invoke_llm([
         SystemMessage(content="""You are a security report writer.
 Produce an executive summary for a security audit.
 Return a JSON object:
