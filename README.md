@@ -49,6 +49,12 @@ A proctoring system that monitors online exams in real time using tab-switch det
 **Exam submitted — AI integrity report generated for invigilator**
 ![ExamGuard Submitted](docs/screenshots/examguard-submitted.png)
 
+**Invigilator monitor dashboard — AI agent pipeline running, SUSPICIOUS verdict (60/100)**
+![ExamGuard Monitor Analysis](docs/screenshots/examguard-monitor-analysis.png)
+
+**Invigilator monitor dashboard — idle state, 100/100 CLEAN score**
+![ExamGuard Monitor Idle](docs/screenshots/examguard-monitor-idle.png)
+
 ---
 
 ### VulnSentinel — Dual scan mode
