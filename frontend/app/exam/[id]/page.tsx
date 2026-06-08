@@ -131,7 +131,11 @@ export default function StudentExamPage({ params }: { params: { id: string } }) 
   if (submitted) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center text-center px-6">
-        <span className="text-5xl mb-4">✅</span>
+        <div className="w-14 h-14 rounded-full bg-sentinel-green/10 border border-sentinel-green/30 flex items-center justify-center mb-4">
+          <svg className="w-7 h-7 text-sentinel-green" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
+          </svg>
+        </div>
         <h2 className="text-2xl font-bold mb-2">Exam Submitted</h2>
         <p className="text-sentinel-muted text-sm max-w-sm">
           Your responses have been saved. The invigilator will receive an AI integrity report shortly.
@@ -249,7 +253,7 @@ export default function StudentExamPage({ params }: { params: { id: string } }) 
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2
                         bg-yellow-50 border border-yellow-300 text-yellow-800 text-xs rounded-xl
                         px-4 py-2.5 shadow-lg z-50">
-          ⚠️ Tab switching detected ({tabCount}×) — this session is being monitored.
+          Tab switching detected ({tabCount}×) — this session is being monitored.
         </div>
       )}
     </div>

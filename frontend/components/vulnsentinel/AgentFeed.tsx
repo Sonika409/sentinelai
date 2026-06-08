@@ -8,16 +8,16 @@ interface Props {
 }
 
 const AGENT_STYLES: Record<string, { color: string; icon: string }> = {
-  Orchestrator:    { color: "text-blue-400",   icon: "🧠" },
-  Scanner:         { color: "text-sentinel-cyan",  icon: "🔍" },
-  VulnAnalyzer:    { color: "text-yellow-400", icon: "⚠️" },
-  ExploitReasoner: { color: "text-orange-400", icon: "💀" },
-  FixSuggester:    { color: "text-green-400",  icon: "🔧" },
-  ReportGenerator: { color: "text-purple-400", icon: "📄" },
-  SessionMonitor:  { color: "text-blue-400",   icon: "👁️" },
-  BehaviorAnalyzer:{ color: "text-yellow-400", icon: "🔬" },
-  AnomalyScorer:   { color: "text-orange-400", icon: "📊" },
-  AlertGenerator:  { color: "text-red-400",    icon: "🚨" },
+  Orchestrator:    { color: "text-blue-400",       icon: "○" },
+  Scanner:         { color: "text-sentinel-cyan",  icon: "○" },
+  VulnAnalyzer:    { color: "text-yellow-400",     icon: "○" },
+  ExploitReasoner: { color: "text-orange-400",     icon: "○" },
+  FixSuggester:    { color: "text-green-400",      icon: "○" },
+  ReportGenerator: { color: "text-purple-400",     icon: "○" },
+  SessionMonitor:  { color: "text-blue-400",       icon: "○" },
+  BehaviorAnalyzer:{ color: "text-yellow-400",     icon: "○" },
+  AnomalyScorer:   { color: "text-orange-400",     icon: "○" },
+  AlertGenerator:  { color: "text-red-400",        icon: "○" },
 }
 
 function parseLine(log: string): { style: { color: string; icon: string }; text: string } {
@@ -28,7 +28,7 @@ function parseLine(log: string): { style: { color: string; icon: string }; text:
     return { style, text: log }
   }
   if (log.includes("ERROR") || log.includes("CRITICAL"))
-    return { style: { color: "text-sentinel-red", icon: "✗" }, text: log }
+    return { style: { color: "text-sentinel-red", icon: "x" }, text: log }
   return { style: { color: "text-slate-400", icon: "·" }, text: log }
 }
 

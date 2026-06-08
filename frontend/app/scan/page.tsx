@@ -15,19 +15,19 @@ function detectScanType(url: string): "github" | "website" | null {
 }
 
 const GITHUB_AGENTS = [
-  ["🧠", "Orchestrator",     "Plans scan strategy for the repository"],
-  ["🔍", "Scanner Agent",    "Clones repo · runs Semgrep + Bandit"],
-  ["⚠️", "Vuln Analyzer",   "Maps findings to OWASP categories & CVEs"],
-  ["💀", "Exploit Reasoner", "Assesses real-world exploitability"],
-  ["🔧", "Fix Suggester",    "Generates code patches per vulnerability"],
+  ["○", "Orchestrator",     "Plans scan strategy for the repository"],
+  ["○", "Scanner Agent",    "Clones repo · runs Semgrep + Bandit"],
+  ["○", "Vuln Analyzer",   "Maps findings to OWASP categories & CVEs"],
+  ["○", "Exploit Reasoner", "Assesses real-world exploitability"],
+  ["○", "Fix Suggester",    "Generates code patches per vulnerability"],
 ]
 
 const WEBSITE_AGENTS = [
-  ["🧠", "Orchestrator",     "Plans HTTP security audit strategy"],
-  ["🌐", "Scanner Agent",    "Checks headers, SSL, cookies, exposed files, CORS"],
-  ["⚠️", "Vuln Analyzer",   "Maps findings to OWASP categories & CVEs"],
-  ["💀", "Exploit Reasoner", "Assesses exploitability of each issue"],
-  ["🔧", "Fix Suggester",    "Generates remediation guidance"],
+  ["○", "Orchestrator",     "Plans HTTP security audit strategy"],
+  ["○", "Scanner Agent",    "Checks headers, SSL, cookies, exposed files, CORS"],
+  ["○", "Vuln Analyzer",   "Maps findings to OWASP categories & CVEs"],
+  ["○", "Exploit Reasoner", "Assesses exploitability of each issue"],
+  ["○", "Fix Suggester",    "Generates remediation guidance"],
 ]
 
 export default function ScanPage() {

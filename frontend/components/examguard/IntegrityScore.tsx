@@ -38,9 +38,9 @@ export default function IntegrityScore({ score, verdict }: Props) {
       </div>
 
       <div className={`text-sm font-semibold tracking-wide ${style.color}`}>
-        {verdict === "CLEAN"      && "✅ CLEAN"}
-        {verdict === "SUSPICIOUS" && "⚠️ SUSPICIOUS"}
-        {verdict === "FLAGGED"    && "🚨 FLAGGED"}
+        {verdict === "CLEAN"      && "CLEAN"}
+        {verdict === "SUSPICIOUS" && "SUSPICIOUS"}
+        {verdict === "FLAGGED"    && "FLAGGED"}
       </div>
     </div>
   )

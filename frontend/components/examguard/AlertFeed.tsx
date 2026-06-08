@@ -12,9 +12,9 @@ export interface Alert {
 }
 
 const SEV_STYLES: Record<string, { bar: string; badge: string; icon: string }> = {
-  CRITICAL: { bar: "border-l-sentinel-red",    badge: "pill-critical", icon: "🚨" },
-  WARNING:  { bar: "border-l-yellow-500",       badge: "pill-medium",   icon: "⚠️" },
-  INFO:     { bar: "border-l-blue-400",         badge: "pill-low",      icon: "ℹ️" },
+  CRITICAL: { bar: "border-l-sentinel-red",    badge: "pill-critical", icon: "!" },
+  WARNING:  { bar: "border-l-yellow-500",       badge: "pill-medium",   icon: "!" },
+  INFO:     { bar: "border-l-blue-400",         badge: "pill-low",      icon: "i" },
 }
 
 function formatTime(ts: number): string {

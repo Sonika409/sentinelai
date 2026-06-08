@@ -140,7 +140,7 @@ export default function FaceMonitor({ onFaceEvent, active }: Props) {
   const faceStatusText =
     faceCount === null ? "—" :
     faceCount === 0    ? "No face" :
-    faceCount === 1    ? "1 face ✓" : `${faceCount} faces ⚠`
+    faceCount === 1    ? "1 face" : `${faceCount} faces (!)`
 
   return (
     <div className="space-y-1">
