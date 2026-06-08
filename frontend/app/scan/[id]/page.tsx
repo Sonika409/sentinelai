@@ -141,12 +141,20 @@ export default function ScanDashboard({ params }: { params: { id: string } }) {
               <p className="text-sm text-slate-300 leading-relaxed">{report.summary.executive_summary}</p>
               {report.summary.key_recommendations?.length > 0 && (
                 <ul className="space-y-1">
-                  {report.summary.key_recommendations.map((r, i) => (
-                    <li key={i} className="text-xs text-sentinel-muted flex gap-2">
-                      <span className="text-sentinel-green shrink-0">▸</span>
-                      <span>{r}</span>
-                    </li>
-                  ))}
+                  {report.summary.key_recommendations.map((r: unknown, i: number) => {
+                    const text = typeof r === "string" ? r
+                      : typeof r === "object" && r !== null
+                        ? (r as Record<string, unknown>).recommendation
+                          ?? (r as Record<string, unknown>).text
+                          ?? JSON.stringify(r)
+                        : String(r)
+                    return (
+                      <li key={i} className="text-xs text-sentinel-muted flex gap-2">
+                        <span className="text-sentinel-green shrink-0">▸</span>
+                        <span>{text as string}</span>
+                      </li>
+                    )
+                  })}
                 </ul>
               )}
             </div>

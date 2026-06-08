@@ -421,6 +421,14 @@ Top findings: {json.dumps(state.get('vulnerabilities', [])[:5], indent=2)}"""),
         "key_recommendations": ["Review and patch all CRITICAL and HIGH findings immediately."],
     })
 
+    # Normalise key_recommendations — local models sometimes return objects
+    recs = summary.get("key_recommendations", [])
+    summary["key_recommendations"] = [
+        r if isinstance(r, str)
+        else r.get("recommendation") or r.get("text") or str(r)
+        for r in (recs if isinstance(recs, list) else [])
+    ]
+
     report = {
         "scan_id": state["scan_id"],
         "repo_url": state["repo_url"],
