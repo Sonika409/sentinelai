@@ -20,6 +20,19 @@ A proctoring system that monitors online exams in real time using tab-switch det
 
 > 📹 **Demo video:** *(add link after recording)*
 
+### Screenshots
+
+**Home — module selector**
+![SentinelAI Home](docs/screenshots/home.png)
+
+**VulnSentinel — scan input (auto-detects GitHub repo or website)**
+![VulnSentinel Scan Input](docs/screenshots/vulnsentinel-scan-input.png)
+
+**VulnSentinel — live agent feed + findings dashboard**
+![VulnSentinel Live Results](docs/screenshots/vulnsentinel-live-results.png)
+
+---
+
 ### VulnSentinel — Dual scan mode
 
 #### GitHub Repo Scan — OWASP Mutillidae (18 vulnerabilities)
