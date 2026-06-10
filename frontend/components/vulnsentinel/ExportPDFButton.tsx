@@ -540,18 +540,34 @@ function footer(doc: JsPDFType, pageNum: number) {
 async function generatePDF(report: ScanReport, scanId: string): Promise<void> {
   // Dynamic import ensures jsPDF is never evaluated during SSR.
   const { jsPDF } = await import("jspdf")
+
+  // ONE document for the whole scan:
+  //   page 1     → cover (URL, date, risk score, severity counts)
+  //   page 2+    → all vulnerabilities, sorted Critical → Low
   const doc = new jsPDF({ unit: "mm", format: "a4", compress: true })
   doc.setFont("helvetica", "normal")
 
   buildCoverPage(doc, report, scanId)
   buildVulnPages(doc, report)
 
-  const slug = report.repo_url
-    .replace(/https?:\/\//, "")
-    .replace(/[^a-zA-Z0-9]/g, "-")
-    .replace(/-+/g, "-")
-    .slice(0, 40)
-  doc.save(`vulnsentinel-${slug}-${scanId.slice(0, 8)}.pdf`)
+  // Filename: vulnsentinel-report-YYYY-MM-DD.pdf
+  const date = new Date().toISOString().slice(0, 10)
+  const filename = `vulnsentinel-report-${date}.pdf`
+
+  // Bulletproof single-download: build a Blob and click a real anchor.
+  // doc.save() relies on jsPDF's internal FileSaver path, which can fail
+  // silently in some browsers / sandboxed iframes. An explicit Blob URL +
+  // <a download> works everywhere and guarantees exactly one download.
+  const blob = doc.output("blob") as Blob
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  // Release the object URL on the next tick (after the download has started).
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
 // ─── Button component ─────────────────────────────────────────────────────────
