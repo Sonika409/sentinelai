@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import AgentFeed from "@/components/vulnsentinel/AgentFeed"
 import VulnCard from "@/components/vulnsentinel/VulnCard"
 import ScanProgress from "@/components/vulnsentinel/ScanProgress"
+import ExportPDFButton from "@/components/vulnsentinel/ExportPDFButton"
 import { useWebSocket } from "@/lib/ws"
 import { useRouter } from "next/navigation"
 
@@ -116,6 +117,9 @@ export default function ScanDashboard({ params }: { params: { id: string } }) {
               {report.summary.overall_risk} RISK · {report.summary.risk_score}/100
             </span>
           )}
+
+          {/* Export PDF — only after scan completes */}
+          {report && <ExportPDFButton report={report} scanId={scanId} />}
         </div>
       </header>
 
