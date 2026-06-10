@@ -1,9 +1,11 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import AgentFeed from "@/components/vulnsentinel/AgentFeed"
 import VulnCard from "@/components/vulnsentinel/VulnCard"
+import ScanProgress from "@/components/vulnsentinel/ScanProgress"
 import { useWebSocket } from "@/lib/ws"
+import { useRouter } from "next/navigation"
 
 const WS_BASE = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8000"
 
@@ -27,10 +29,13 @@ interface Report {
 export default function ScanDashboard({ params }: { params: { id: string } }) {
   const { id: scanId } = params
   const wsUrl = `${WS_BASE}/ws/${scanId}`
+  const router = useRouter()
+  const resultsRef = useRef<HTMLDivElement>(null)
 
-  const [logs, setLogs]       = useState<string[]>([])
-  const [report, setReport]   = useState<Report | null>(null)
+  const [logs, setLogs]           = useState<string[]>([])
+  const [report, setReport]       = useState<Report | null>(null)
   const [activeNode, setActiveNode] = useState<string>("")
+  const [scanDone, setScanDone]   = useState(false)
 
   const { status } = useWebSocket(wsUrl, (msg) => {
     if (msg.type === "update") {
@@ -41,6 +46,7 @@ export default function ScanDashboard({ params }: { params: { id: string } }) {
     if (msg.type === "done") {
       setReport(msg.report as Report)
       setActiveNode("")
+      setScanDone(true)
     }
     if (msg.type === "error") {
       setLogs((prev) => [...prev, `[ERROR] ${msg.message as string}`])
@@ -115,9 +121,32 @@ export default function ScanDashboard({ params }: { params: { id: string } }) {
 
       {/* Main split */}
       <div className="flex flex-1 overflow-hidden gap-0">
-        {/* Left: agent feed */}
-        <div className="w-[55%] p-4 overflow-hidden">
-          <AgentFeed logs={logs} isRunning={isRunning} />
+        {/* Left: ScanProgress (while running) → AgentFeed (always) */}
+        <div className="w-[55%] flex flex-col overflow-hidden">
+          {/* ScanProgress panel — visible until scan completes, then collapses */}
+          <div
+            className="shrink-0 overflow-hidden transition-all duration-700"
+            style={{
+              maxHeight: scanDone ? "0px" : "100%",
+              opacity:   scanDone ? 0 : 1,
+              padding:   scanDone ? "0" : undefined,
+            }}
+          >
+            <div className="p-4">
+              <ScanProgress
+                scanId={scanId}
+                onComplete={() => {
+                  resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+                }}
+                onRetry={() => router.push("/scan")}
+              />
+            </div>
+          </div>
+
+          {/* AgentFeed — always mounted, fills remaining height */}
+          <div className="flex-1 p-4 overflow-hidden" style={{ minHeight: 0 }}>
+            <AgentFeed logs={logs} isRunning={isRunning} />
+          </div>
         </div>
 
         {/* Right: findings */}
@@ -159,6 +188,9 @@ export default function ScanDashboard({ params }: { params: { id: string } }) {
               )}
             </div>
           )}
+
+          {/* Scroll anchor — ScanProgress triggers scroll here on completion */}
+          <div ref={resultsRef} />
 
           {/* Vuln list */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
