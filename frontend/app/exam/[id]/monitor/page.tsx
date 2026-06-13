@@ -98,8 +98,9 @@ export default function InvigilatorMonitor({ params }: { params: { id: string } 
   }
 
   // ── Live clock ─────────────────────────────────────────────
-  const [time, setTime] = useState(new Date().toLocaleTimeString("en-IN", { hour12: false }))
+  const [time, setTime] = useState("")   // empty on server → no hydration mismatch
   useEffect(() => {
+    setTime(new Date().toLocaleTimeString("en-IN", { hour12: false }))
     const t = setInterval(() => setTime(new Date().toLocaleTimeString("en-IN", { hour12: false })), 1000)
     return () => clearInterval(t)
   }, [])
