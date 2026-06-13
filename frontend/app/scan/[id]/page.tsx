@@ -86,17 +86,17 @@ export default function ScanDashboard({ params }: { params: { id: string } }) {
         <span className="text-sentinel-border">·</span>
         <span className="text-xs font-mono text-sentinel-muted">scan/{scanId}</span>
 
-        <a href="/history"
-           className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-sentinel-cyan/10
-                      text-sentinel-cyan border border-sentinel-cyan/30 hover:bg-sentinel-cyan/20
-                      transition-colors font-medium">
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-          </svg>
-          Scan History
-        </a>
-
         <div className="ml-auto flex items-center gap-4">
+          {/* History button — always visible */}
+          <a href="/history"
+             className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-sentinel-cyan/10
+                        text-sentinel-cyan border border-sentinel-cyan/30 hover:bg-sentinel-cyan/20
+                        transition-colors font-medium shrink-0">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            Scan History
+          </a>
           {/* WS status */}
           <span className={`flex items-center gap-1.5 text-xs font-mono ${
             status === "open" ? "text-sentinel-green" :
