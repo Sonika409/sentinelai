@@ -26,6 +26,31 @@ export const getReport = (scan_id: string) =>
 export const listScans = () =>
   req<{ scan_id: string; repo_url: string; status: string; started_at: number }[]>("/api/scans")
 
+export interface ScanHistoryRecord {
+  scan_id:         string
+  repo_url:        string
+  scan_date:       string
+  timestamp:       number
+  total_vulns:     number
+  severity:        { critical: number; high: number; medium: number; low: number }
+  risk_score:      number
+  overall_risk:    string
+  vulnerabilities: unknown[]
+  patches:         unknown[]
+  summary:         Record<string, unknown>
+}
+
+export const listScanHistory = () =>
+  req<ScanHistoryRecord[]>("/api/scans/history")
+
+export const getScanHistory = (scan_id: string) =>
+  req<ScanHistoryRecord>(`/api/scans/history/${scan_id}`)
+
+export const deleteScanHistory = (scan_id: string) =>
+  fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/api/scans/history/${scan_id}`, {
+    method: "DELETE",
+  }).then((r) => { if (!r.ok && r.status !== 204) throw new Error("Delete failed") })
+
 // ── ExamGuard ─────────────────────────────────────────────────
 
 export const createExamSession = (data: {

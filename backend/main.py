@@ -34,11 +34,13 @@ ExamGuard analysis socket (/ws/exam/{id}/analysis):
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import time
 import uuid
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Dict, List
 
 from dotenv import load_dotenv
@@ -63,6 +65,56 @@ from exam_agents.event_rules import (
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(name)s  %(message)s")
 logger = logging.getLogger("sentinelai")
+
+# ── Scan history persistence ──────────────────────────────────
+_HISTORY_FILE = Path(os.getenv("HISTORY_FILE", "scan_history.json"))
+_history_lock = asyncio.Lock()
+
+
+def _load_history() -> list[dict]:
+    if not _HISTORY_FILE.exists():
+        return []
+    try:
+        return json.loads(_HISTORY_FILE.read_text())
+    except Exception:
+        return []
+
+
+async def _save_history(records: list[dict]) -> None:
+    async with _history_lock:
+        _HISTORY_FILE.write_text(json.dumps(records, indent=2))
+
+
+async def _append_scan_history(scan_id: str, repo_url: str, report: dict, started_at: float) -> None:
+    """Persist a completed scan to scan_history.json. Called only on success."""
+    vulns: list[dict] = report.get("vulnerabilities", [])
+    sev: dict[str, int] = {}
+    for v in vulns:
+        s = v.get("severity", "UNKNOWN")
+        sev[s] = sev.get(s, 0) + 1
+
+    record = {
+        "scan_id":         scan_id,
+        "repo_url":        repo_url,
+        "scan_date":       time.strftime("%Y-%m-%d", time.gmtime(started_at)),
+        "timestamp":       started_at,
+        "total_vulns":     len(vulns),
+        "severity":        {"critical": sev.get("CRITICAL", 0), "high": sev.get("HIGH", 0),
+                            "medium": sev.get("MEDIUM", 0), "low": sev.get("LOW", 0)},
+        "risk_score":      report.get("summary", {}).get("risk_score", 0),
+        "overall_risk":    report.get("summary", {}).get("overall_risk", "UNKNOWN"),
+        "vulnerabilities": vulns,
+        "patches":         report.get("patches", []),
+        "summary":         report.get("summary", {}),
+    }
+
+    async with _history_lock:
+        records = _load_history()
+        # Replace if scan_id already in history (re-scan edge case)
+        records = [r for r in records if r.get("scan_id") != scan_id]
+        records.insert(0, record)
+        _HISTORY_FILE.write_text(json.dumps(records, indent=2))
+    logger.info("Scan %s saved to history (%d total)", scan_id, len(records) + 1)
 
 # ── Operational limits (overridable via environment) ──────────
 MAX_CONCURRENT_SCANS   = int(os.getenv("MAX_CONCURRENT_SCANS", "3"))
@@ -206,6 +258,9 @@ async def _run_scan(repo_url: str, scan_id: str) -> None:
 
         await queue.put({"type": "done", "scan_id": scan_id, "report": report})
 
+        # Persist to history only on successful completion
+        await _append_scan_history(scan_id, repo_url, report, _scans[scan_id]["started_at"])
+
     except TimeoutError:
         logger.error("Scan %s exceeded %ss timeout", scan_id, SCAN_TIMEOUT_SECS)
         _scans[scan_id]["status"] = "error"
@@ -278,6 +333,32 @@ async def list_scans() -> list[ScanSummary]:
         )
         for sid, data in sorted(_scans.items(), key=lambda x: x[1]["started_at"], reverse=True)
     ]
+
+
+@app.get("/api/scans/history")
+async def list_scan_history() -> list[dict]:
+    """Return all completed scans from history, newest first."""
+    return _load_history()
+
+
+@app.get("/api/scans/history/{scan_id}")
+async def get_scan_history(scan_id: str) -> dict:
+    """Return full details of one historical scan."""
+    for record in _load_history():
+        if record.get("scan_id") == scan_id:
+            return record
+    raise HTTPException(status_code=404, detail="Scan not found in history")
+
+
+@app.delete("/api/scans/history/{scan_id}", status_code=204)
+async def delete_scan_history(scan_id: str) -> None:
+    """Remove one scan from history."""
+    async with _history_lock:
+        records = _load_history()
+        filtered = [r for r in records if r.get("scan_id") != scan_id]
+        if len(filtered) == len(records):
+            raise HTTPException(status_code=404, detail="Scan not found in history")
+        _HISTORY_FILE.write_text(json.dumps(filtered, indent=2))
 
 
 @app.get("/health")
