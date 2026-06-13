@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -45,9 +46,11 @@ load_dotenv()
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from agents.orchestrator import _graph, _initial_state
+from tools.url_guard import assert_safe_target, UnsafeTargetError
+from tools.git_cloner import cleanup_repo
 from exam_agents.exam_pipeline import _exam_graph, stream_exam_analysis
 from exam_agents.exam_state import ExamSession
 from exam_agents.event_rules import (
@@ -55,10 +58,22 @@ from exam_agents.event_rules import (
     check_face_event,
     check_tab_event,
     check_absence_duration,
+    check_phone_detected,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(name)s  %(message)s")
 logger = logging.getLogger("sentinelai")
+
+# ── Operational limits (overridable via environment) ──────────
+MAX_CONCURRENT_SCANS   = int(os.getenv("MAX_CONCURRENT_SCANS", "3"))
+SCAN_TIMEOUT_SECS      = float(os.getenv("SCAN_TIMEOUT_SECS", "600"))
+ANALYSIS_TIMEOUT_SECS  = float(os.getenv("ANALYSIS_TIMEOUT_SECS", "300"))
+SESSION_TTL_SECS       = float(os.getenv("SESSION_TTL_SECS", str(24 * 3600)))
+JANITOR_INTERVAL_SECS  = float(os.getenv("JANITOR_INTERVAL_SECS", "600"))
+MAX_EVENTS_PER_LIST    = int(os.getenv("MAX_EVENTS_PER_LIST", "5000"))
+
+# Phone detection runs client-side (coco-ssd in the browser); the browser
+# sends a `phone_detected` event, handled below. No server-side ML needed.
 
 # ── In-process registries ─────────────────────────────────────
 _scans: Dict[str, dict] = {}           # VulnSentinel scan sessions
@@ -69,18 +84,39 @@ _exam_sessions: Dict[str, dict] = {}   # ExamGuard sessions
 #  App lifecycle
 # ══════════════════════════════════════════════════════════════
 
+async def _janitor() -> None:
+    """Periodically purge finished scans/sessions older than SESSION_TTL_SECS."""
+    while True:
+        await asyncio.sleep(JANITOR_INTERVAL_SECS)
+        cutoff = time.time() - SESSION_TTL_SECS
+        for sid in [s for s, d in _scans.items()
+                    if d["status"] in ("done", "error") and d["started_at"] < cutoff]:
+            _scans.pop(sid, None)
+            logger.info("Janitor: purged expired scan %s", sid)
+        for eid in [e for e, d in _exam_sessions.items()
+                    if d["session"]["status"] in ("done", "error") and d["started_at"] < cutoff]:
+            _exam_sessions.pop(eid, None)
+            logger.info("Janitor: purged expired exam session %s", eid)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    janitor = asyncio.create_task(_janitor())
     yield
+    janitor.cancel()
     _scans.clear()
     _exam_sessions.clear()
 
 
 app = FastAPI(title="SentinelAI", version="0.1.0", lifespan=lifespan)
 
+_default_origins = "http://localhost:3000,http://127.0.0.1:3000"
+# ALLOWED_ORIGIN_REGEX is handy for Vercel preview URLs, e.g.
+#   https://.*\.vercel\.app
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=[o.strip() for o in os.getenv("ALLOWED_ORIGINS", _default_origins).split(",") if o.strip()],
+    allow_origin_regex=os.getenv("ALLOWED_ORIGIN_REGEX") or None,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -92,15 +128,18 @@ app.add_middleware(
 # ══════════════════════════════════════════════════════════════
 
 class ScanRequest(BaseModel):
-    repo_url: str
+    repo_url: str = Field(min_length=4, max_length=2048)
 
     @field_validator("repo_url")
     @classmethod
-    def must_be_git_url(cls, v: str) -> str:
+    def must_be_https_url(cls, v: str) -> str:
         v = v.strip()
-        if not (v.startswith("https://") or v.startswith("git@")):
-            raise ValueError("repo_url must be an https:// or git@ URL")
-        return v
+        if v.startswith(("http://", "https://")):
+            return v
+        # Bare domain like "example.com" — scheme is added downstream
+        if "://" not in v and " " not in v and "." in v:
+            return v
+        raise ValueError("repo_url must be an http(s) URL or a bare domain")
 
 
 class ScanResponse(BaseModel):
@@ -122,32 +161,32 @@ class ScanSummary(BaseModel):
 
 async def _run_scan(repo_url: str, scan_id: str) -> None:
     queue: asyncio.Queue = _scans[scan_id]["queue"]
+    accumulated: dict = {}
 
     try:
         state = _initial_state(repo_url, scan_id)
         config = {"configurable": {"thread_id": scan_id}}
 
-        accumulated: dict = {}
+        async with asyncio.timeout(SCAN_TIMEOUT_SECS):
+            async for event in _graph.astream(state, config=config):
+                node_name, node_output = next(iter(event.items()))
 
-        async for event in _graph.astream(state, config=config):
-            node_name, node_output = next(iter(event.items()))
+                # Merge into accumulated so we can retrieve the report at the end.
+                # agent_logs uses operator.add so we handle it manually.
+                for k, v in node_output.items():
+                    if k == "agent_logs":
+                        accumulated.setdefault("agent_logs", [])
+                        accumulated["agent_logs"].extend(v)
+                    else:
+                        accumulated[k] = v
 
-            # Merge into accumulated so we can retrieve the report at the end.
-            # agent_logs uses operator.add so we handle it manually.
-            for k, v in node_output.items():
-                if k == "agent_logs":
-                    accumulated.setdefault("agent_logs", [])
-                    accumulated["agent_logs"].extend(v)
-                else:
-                    accumulated[k] = v
-
-            await queue.put({
-                "type": "update",
-                "node": node_name,
-                "logs": node_output.get("agent_logs", []),
-                "status": node_output.get("status", ""),
-                "scan_id": scan_id,
-            })
+                await queue.put({
+                    "type": "update",
+                    "node": node_name,
+                    "logs": node_output.get("agent_logs", []),
+                    "status": node_output.get("status", ""),
+                    "scan_id": scan_id,
+                })
 
         report = accumulated.get("report", {})
         _scans[scan_id]["report"] = report
@@ -155,12 +194,20 @@ async def _run_scan(repo_url: str, scan_id: str) -> None:
 
         await queue.put({"type": "done", "scan_id": scan_id, "report": report})
 
-    except Exception as exc:
+    except TimeoutError:
+        logger.error("Scan %s exceeded %ss timeout", scan_id, SCAN_TIMEOUT_SECS)
+        _scans[scan_id]["status"] = "error"
+        await queue.put({"type": "error", "scan_id": scan_id,
+                         "message": f"Scan timed out after {int(SCAN_TIMEOUT_SECS)}s"})
+
+    except Exception:
         logger.exception("Scan %s crashed", scan_id)
         _scans[scan_id]["status"] = "error"
-        await queue.put({"type": "error", "scan_id": scan_id, "message": str(exc)})
+        await queue.put({"type": "error", "scan_id": scan_id,
+                         "message": "Scan failed due to an internal error — see server logs"})
 
     finally:
+        cleanup_repo(scan_id)  # remove cloned repo, if any
         await queue.put(None)  # sentinel — unblocks the WebSocket reader
 
 
@@ -170,6 +217,19 @@ async def _run_scan(repo_url: str, scan_id: str) -> None:
 
 @app.post("/api/scan", response_model=ScanResponse, status_code=201)
 async def start_scan(req: ScanRequest) -> ScanResponse:
+    active = sum(1 for s in _scans.values() if s["status"] not in ("done", "error"))
+    if active >= MAX_CONCURRENT_SCANS:
+        raise HTTPException(status_code=429,
+                            detail=f"Too many scans in progress ({active}/{MAX_CONCURRENT_SCANS}) — try again shortly")
+
+    try:
+        # Resolve in a thread — getaddrinfo blocks
+        await asyncio.get_running_loop().run_in_executor(None, assert_safe_target, req.repo_url)
+    except UnsafeTargetError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
     scan_id = str(uuid.uuid4())[:8]
     _scans[scan_id] = {
         "queue": asyncio.Queue(),
@@ -210,7 +270,16 @@ async def list_scans() -> list[ScanSummary]:
 
 @app.get("/health")
 async def health() -> dict:
-    return {"status": "ok", "active_scans": sum(1 for s in _scans.values() if s["status"] not in ("done", "error"))}
+    from agents.llm_router import get_active_backend
+    return {
+        "status": "ok",
+        "version": app.version,
+        "llm_backend": get_active_backend(),
+        "active_scans": sum(1 for s in _scans.values() if s["status"] not in ("done", "error")),
+        "active_exam_sessions": sum(
+            1 for e in _exam_sessions.values() if e["session"]["status"] == "active"
+        ),
+    }
 
 
 # ══════════════════════════════════════════════════════════════
@@ -273,10 +342,10 @@ async def ws_scan_feed(websocket: WebSocket, scan_id: str) -> None:
 # ══════════════════════════════════════════════════════════════
 
 class ExamSessionRequest(BaseModel):
-    student_id:       str
-    student_name:     str
-    exam_name:        str
-    duration_minutes: int = 60
+    student_id:       str = Field(min_length=1, max_length=100)
+    student_name:     str = Field(min_length=1, max_length=200)
+    exam_name:        str = Field(min_length=1, max_length=200)
+    duration_minutes: int = Field(default=60, ge=1, le=600)
 
 
 class ExamSessionResponse(BaseModel):
@@ -360,6 +429,10 @@ async def trigger_analysis(exam_id: str) -> dict:
         raise HTTPException(status_code=404, detail="Exam session not found")
 
     session = entry["session"]
+    if session["status"] == "analyzing":
+        # Analysis already running — don't spawn a duplicate pipeline
+        return {"exam_id": exam_id, "status": "analyzing", "ws_url": f"/ws/exam/{exam_id}/analysis"}
+
     if session["status"] == "active":
         session["status"]   = "ended"
         session["ended_at"] = time.time()
@@ -411,24 +484,25 @@ async def _run_exam_analysis(exam_id: str) -> None:
         config      = {"configurable": {"thread_id": exam_id}}
         accumulated: dict = {}
 
-        async for event in _exam_graph.astream(session, config=config):
-            node_name, node_output = next(iter(event.items()))
+        async with asyncio.timeout(ANALYSIS_TIMEOUT_SECS):
+            async for event in _exam_graph.astream(session, config=config):
+                node_name, node_output = next(iter(event.items()))
 
-            # Accumulate full node output so report/score/verdict are captured
-            for k, v in node_output.items():
-                if k == "agent_logs":
-                    accumulated.setdefault("agent_logs", [])
-                    accumulated["agent_logs"].extend(v if isinstance(v, list) else [v])
-                else:
-                    accumulated[k] = v
+                # Accumulate full node output so report/score/verdict are captured
+                for k, v in node_output.items():
+                    if k == "agent_logs":
+                        accumulated.setdefault("agent_logs", [])
+                        accumulated["agent_logs"].extend(v if isinstance(v, list) else [v])
+                    else:
+                        accumulated[k] = v
 
-            await queue.put({
-                "type":    "analysis_update",
-                "node":    node_name,
-                "logs":    node_output.get("agent_logs", []),
-                "status":  node_output.get("status", ""),
-                "exam_id": exam_id,
-            })
+                await queue.put({
+                    "type":    "analysis_update",
+                    "node":    node_name,
+                    "logs":    node_output.get("agent_logs", []),
+                    "status":  node_output.get("status", ""),
+                    "exam_id": exam_id,
+                })
 
         # Persist final state back into the live session object
         for field in ("report", "verdict", "integrity_score", "behavior_flags",
@@ -443,10 +517,17 @@ async def _run_exam_analysis(exam_id: str) -> None:
             "report":  session["report"],
         })
 
-    except Exception as exc:
+    except TimeoutError:
+        logger.error("Exam analysis %s exceeded %ss timeout", exam_id, ANALYSIS_TIMEOUT_SECS)
+        session["status"] = "error"
+        await queue.put({"type": "error", "exam_id": exam_id,
+                         "message": f"Analysis timed out after {int(ANALYSIS_TIMEOUT_SECS)}s"})
+
+    except Exception:
         logger.exception("Exam analysis %s crashed", exam_id)
         session["status"] = "error"
-        await queue.put({"type": "error", "exam_id": exam_id, "message": str(exc)})
+        await queue.put({"type": "error", "exam_id": exam_id,
+                         "message": "Analysis failed due to an internal error — see server logs"})
 
     finally:
         await queue.put(None)
@@ -464,11 +545,21 @@ async def _fan_out(entry: dict, msg: dict) -> None:
 #  immediate alerts back in real-time.
 # ══════════════════════════════════════════════════════════════
 
+def _append_capped(lst: list, item: dict) -> None:
+    """Append an event, dropping the oldest beyond MAX_EVENTS_PER_LIST."""
+    lst.append(item)
+    if len(lst) > MAX_EVENTS_PER_LIST:
+        del lst[: len(lst) - MAX_EVENTS_PER_LIST]
+
+
 @app.websocket("/ws/exam/{exam_id}")
 async def ws_exam_events(websocket: WebSocket, exam_id: str) -> None:
     entry = _exam_sessions.get(exam_id)
     if not entry:
         await websocket.close(code=4004, reason="Exam session not found")
+        return
+    if entry["session"]["status"] != "active":
+        await websocket.close(code=4003, reason="Exam session is no longer active")
         return
 
     await websocket.accept()
@@ -493,7 +584,7 @@ async def ws_exam_events(websocket: WebSocket, exam_id: str) -> None:
 
             # ── Tab events ───────────────────────────────────
             if event_type == "tab_event":
-                session["tab_events"].append(data)
+                _append_capped(session["tab_events"], data)
                 blur_count = sum(
                     1 for e in session["tab_events"]
                     if e.get("event_type") in ("blur", "hidden")
@@ -506,7 +597,7 @@ async def ws_exam_events(websocket: WebSocket, exam_id: str) -> None:
 
             # ── Face events ──────────────────────────────────
             elif event_type == "face_event":
-                session["face_events"].append(data)
+                _append_capped(session["face_events"], data)
                 face_count = data.get("face_count", 1)
                 confidence = data.get("confidence", 1.0)
                 ts         = data.get("timestamp", time.time())
@@ -535,9 +626,20 @@ async def ws_exam_events(websocket: WebSocket, exam_id: str) -> None:
 
             # ── Copy-paste ───────────────────────────────────
             elif event_type == "copy_paste":
-                session["copy_paste_events"].append(data)
+                _append_capped(session["copy_paste_events"], data)
                 count = len(session["copy_paste_events"])
                 alert = check_copy_paste(count, data.get("timestamp", time.time()))
+                if alert:
+                    await websocket.send_json(alert)
+                    session["immediate_alerts"].append(alert)
+                    await _fan_out(entry, alert)
+
+            # ── Phone detection (client-side coco-ssd) ───────
+            elif event_type == "phone_detected":
+                _append_capped(session.setdefault("phone_events", []), data)
+                phone_count = len(session["phone_events"])
+                confidence  = data.get("confidence", 0.0)
+                alert = check_phone_detected(phone_count, confidence, data.get("timestamp", time.time()))
                 if alert:
                     await websocket.send_json(alert)
                     session["immediate_alerts"].append(alert)
@@ -562,10 +664,10 @@ async def ws_exam_events(websocket: WebSocket, exam_id: str) -> None:
 
     except WebSocketDisconnect:
         logger.info("Exam event WS disconnected for %s", exam_id)
-    except Exception as exc:
-        logger.error("Exam event WS error for %s: %s", exam_id, exc)
+    except Exception:
+        logger.exception("Exam event WS error for %s", exam_id)
         try:
-            await websocket.send_json({"type": "error", "message": str(exc)})
+            await websocket.send_json({"type": "error", "message": "Internal error processing exam events"})
         except Exception:
             pass
     finally:
@@ -611,7 +713,8 @@ async def ws_exam_monitor(websocket: WebSocket, exam_id: str) -> None:
     except Exception as exc:
         logger.error("Monitor WS error for exam %s: %s", exam_id, exc)
     finally:
-        entry["monitor_queues"].remove(q)
+        if q in entry["monitor_queues"]:
+            entry["monitor_queues"].remove(q)
         try:
             await websocket.close()
         except Exception:

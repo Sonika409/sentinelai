@@ -4,14 +4,17 @@ const nextConfig = {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000",
     NEXT_PUBLIC_WS_URL:  process.env.NEXT_PUBLIC_WS_URL  || "ws://localhost:8000",
   },
-  transpilePackages: ["@vladmandic/face-api"],
+  transpilePackages: ["@vladmandic/face-api", "@tensorflow-models/coco-ssd"],
   webpack: (config, { isServer }) => {
-    // face-api / tfjs use dynamic require for backends — suppress warnings
+    // Required for MediaPipe WASM modules
+    config.experiments = { ...config.experiments, asyncWebAssembly: true }
+
     config.ignoreWarnings = [
       { module: /@vladmandic\/face-api/ },
       { module: /@tensorflow/ },
+      { module: /@mediapipe/ },
     ]
-    // Prevent tfjs backend dynamic requires from producing /_next/undefined chunks
+
     if (!isServer) {
       config.resolve.alias = {
         ...config.resolve.alias,

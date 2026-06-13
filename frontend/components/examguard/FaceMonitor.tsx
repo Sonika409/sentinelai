@@ -3,49 +3,70 @@
 import { useEffect, useRef, useState } from "react"
 
 interface Props {
-  onFaceEvent: (faceCount: number, confidence: number) => void
-  active: boolean
+  onFaceEvent:    (faceCount: number, confidence: number) => void
+  onPhoneEvent?:  (confidence: number) => void
+  active:         boolean
 }
 
 type ModelStatus = "loading" | "ready" | "error"
 
-export default function FaceMonitor({ onFaceEvent, active }: Props) {
+// coco-ssd label for a phone; detection runs entirely in the browser (WebGL)
+const PHONE_CLASS      = "cell phone"
+const PHONE_CONF_MIN   = 0.5
+
+export default function FaceMonitor({ onFaceEvent, onPhoneEvent, active }: Props) {
   const videoRef    = useRef<HTMLVideoElement>(null)
   const canvasRef   = useRef<HTMLCanvasElement>(null)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const phoneModelRef = useRef<unknown>(null)   // coco-ssd model, lazy-loaded
+  const phoneHideRef  = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const onFaceEventRef  = useRef(onFaceEvent)
+  const onPhoneEventRef = useRef(onPhoneEvent)
+
+  useEffect(() => { onFaceEventRef.current  = onFaceEvent  }, [onFaceEvent])
+  useEffect(() => { onPhoneEventRef.current = onPhoneEvent }, [onPhoneEvent])
 
   const [camError,     setCamError]     = useState<string | null>(null)
   const [streaming,    setStreaming]     = useState(false)
   const [modelStatus,  setModelStatus]  = useState<ModelStatus>("loading")
   const [faceCount,    setFaceCount]    = useState<number | null>(null)
+  const [phoneVisible, setPhoneVisible] = useState(false)
 
-  // Load face-api models once
+  // ── Load face-api once ──────────────────────────────────────
   useEffect(() => {
     if (!active) return
     let cancelled = false
-
     async function loadModels() {
       try {
         const faceapi = await import("@vladmandic/face-api")
         await faceapi.nets.tinyFaceDetector.loadFromUri("/models")
         if (!cancelled) setModelStatus("ready")
       } catch (e) {
-        console.error("face-api model load failed:", e)
+        console.error("[FaceMonitor] face-api load failed:", e)
         if (!cancelled) setModelStatus("error")
       }
+      // Phone detector loads in the background — non-fatal if it fails
+      try {
+        await import("@tensorflow/tfjs")
+        const cocoSsd = await import("@tensorflow-models/coco-ssd")
+        const model = await cocoSsd.load({ base: "lite_mobilenet_v2" })
+        if (!cancelled) phoneModelRef.current = model
+      } catch (e) {
+        console.warn("[FaceMonitor] phone model (coco-ssd) load failed:", e)
+      }
     }
-
     loadModels()
     return () => { cancelled = true }
   }, [active])
 
-  // Start webcam once model is ready
+  // ── Start webcam ────────────────────────────────────────────
   useEffect(() => {
     if (!active || modelStatus !== "ready") return
     let stream: MediaStream | null = null
 
     navigator.mediaDevices
-      .getUserMedia({ video: { width: 320, height: 240, facingMode: "user" } })
+      .getUserMedia({ video: { width: 640, height: 480, facingMode: "user" } })
       .then((s) => {
         stream = s
         if (videoRef.current) {
@@ -62,7 +83,7 @@ export default function FaceMonitor({ onFaceEvent, active }: Props) {
     }
   }, [active, modelStatus])
 
-  // Run detection every 3 s once streaming
+  // ── Detection loop ──────────────────────────────────────────
   useEffect(() => {
     if (!streaming || modelStatus !== "ready") return
 
@@ -70,24 +91,43 @@ export default function FaceMonitor({ onFaceEvent, active }: Props) {
       if (!videoRef.current) return
       try {
         const faceapi = await import("@vladmandic/face-api")
+
+        // ── Face detection ────────────────────────────
         const detections = await faceapi.detectAllFaces(
           videoRef.current,
-          new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.4 })
+          new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.4 }),
         )
-
-        const count = detections.length
-        const bestScore = count > 0
-          ? Math.max(...detections.map((d) => d.score))
-          : 0
-
+        const count     = detections.length
+        const bestScore = count > 0 ? Math.max(...detections.map((d) => d.score)) : 0
         setFaceCount(count)
-        onFaceEvent(count, parseFloat(bestScore.toFixed(2)))
+        onFaceEventRef.current(count, parseFloat(bestScore.toFixed(2)))
 
-        // Draw bounding boxes on overlay canvas
+        // ── Phone detection (coco-ssd, in-browser) ─────
+        if (phoneModelRef.current && videoRef.current.readyState >= 2) {
+          try {
+            const model = phoneModelRef.current as {
+              detect: (el: HTMLVideoElement) => Promise<{ class: string; score: number }[]>
+            }
+            const predictions = await model.detect(videoRef.current)
+            const phone = predictions.find(
+              (p) => p.class === PHONE_CLASS && p.score >= PHONE_CONF_MIN,
+            )
+            if (phone) {
+              setPhoneVisible(true)
+              if (phoneHideRef.current) clearTimeout(phoneHideRef.current)
+              phoneHideRef.current = setTimeout(() => setPhoneVisible(false), 6000)
+              onPhoneEventRef.current?.(parseFloat(phone.score.toFixed(2)))
+            }
+          } catch (e) {
+            console.warn("[FaceMonitor] phone detection frame failed:", e)
+          }
+        }
+
+        // ── Draw face boxes ───────────────────────────
         if (canvasRef.current && videoRef.current) {
           const dims = {
-            width:  videoRef.current.videoWidth  || 320,
-            height: videoRef.current.videoHeight || 240,
+            width:  videoRef.current.videoWidth  || 640,
+            height: videoRef.current.videoHeight || 480,
           }
           faceapi.matchDimensions(canvasRef.current, dims)
           const resized = faceapi.resizeResults(detections, dims)
@@ -107,19 +147,18 @@ export default function FaceMonitor({ onFaceEvent, active }: Props) {
           }
         }
       } catch (e) {
-        console.warn("Detection frame failed:", e)
+        console.warn("[FaceMonitor] detection frame failed:", e)
       }
     }
 
     intervalRef.current = setInterval(detect, 3000)
-    detect() // run immediately on start
-
+    detect()
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)
     }
-  }, [streaming, modelStatus, onFaceEvent])
+  }, [streaming, modelStatus])
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Render ─────────────────────────────────────────────────
 
   if (camError) {
     return (
@@ -145,21 +184,9 @@ export default function FaceMonitor({ onFaceEvent, active }: Props) {
   return (
     <div className="space-y-1">
       <div className="relative aspect-video rounded-xl overflow-hidden bg-black border border-sentinel-border">
-        {/* Webcam feed (mirrored) */}
-        <video
-          ref={videoRef}
-          muted
-          playsInline
-          className="w-full h-full object-cover scale-x-[-1]"
-        />
+        <video ref={videoRef} muted playsInline className="w-full h-full object-cover scale-x-[-1]" />
+        <canvas ref={canvasRef} className="absolute inset-0 w-full h-full scale-x-[-1] pointer-events-none" />
 
-        {/* Detection overlay canvas (mirrored to match video) */}
-        <canvas
-          ref={canvasRef}
-          className="absolute inset-0 w-full h-full scale-x-[-1] pointer-events-none"
-        />
-
-        {/* Status overlays */}
         {!streaming && modelStatus === "loading" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-sentinel-surface">
             <svg className="w-5 h-5 animate-spin text-sentinel-muted" fill="none" viewBox="0 0 24 24">
@@ -176,18 +203,16 @@ export default function FaceMonitor({ onFaceEvent, active }: Props) {
           </div>
         )}
 
-        {/* LIVE badge */}
         {streaming && (
-          <div className="absolute top-2 right-2 flex items-center gap-1.5 bg-black/60 rounded-full px-2 py-1">
+          <div className="absolute bottom-2 right-2 flex items-center gap-1.5 bg-black/60 rounded-full px-2 py-1">
             <span className="w-1.5 h-1.5 rounded-full bg-sentinel-green animate-pulse" />
             <span className="text-[10px] font-mono text-sentinel-green">LIVE</span>
           </div>
         )}
 
-        {/* Face count badge */}
-        {streaming && faceCount !== null && (
-          <div className="absolute bottom-2 left-2 bg-black/60 rounded-full px-2 py-1">
-            <span className={`text-[10px] font-mono ${faceStatusColor}`}>{faceStatusText}</span>
+        {streaming && phoneVisible && (
+          <div className="absolute top-2 left-2 bg-red-600/90 rounded-full px-2 py-1 animate-pulse">
+            <span className="text-[10px] font-mono text-white">📱 PHONE</span>
           </div>
         )}
       </div>

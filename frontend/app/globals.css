@@ -28,6 +28,17 @@ body {
   50%       { opacity: 0; }
 }
 
+/* ScanProgress animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
 /* Severity pill */
 .pill-critical { @apply bg-red-500/15 text-red-400 border border-red-500/30; }
 .pill-high     { @apply bg-orange-500/15 text-orange-400 border border-orange-500/30; }
