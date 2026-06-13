@@ -39,7 +39,7 @@ import os
 import time
 import uuid
 from contextlib import asynccontextmanager
-from typing import Dict
+from typing import Dict, List
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -78,6 +78,18 @@ MAX_EVENTS_PER_LIST    = int(os.getenv("MAX_EVENTS_PER_LIST", "5000"))
 # ── In-process registries ─────────────────────────────────────
 _scans: Dict[str, dict] = {}           # VulnSentinel scan sessions
 _exam_sessions: Dict[str, dict] = {}   # ExamGuard sessions
+
+# Global multi-student monitor: fan-out queues for the class-wide host
+# dashboard, plus the latest trust snapshot per exam (so a dashboard that
+# connects mid-exam immediately sees every active student).
+_global_monitor_queues: List[asyncio.Queue] = []
+_latest_trust: Dict[str, dict] = {}    # exam_id → last trust_update payload
+
+
+async def _broadcast_global(msg: dict) -> None:
+    """Push a message to every connected class-wide dashboard."""
+    for q in list(_global_monitor_queues):
+        await q.put(msg)
 
 
 # ══════════════════════════════════════════════════════════════
@@ -645,6 +657,29 @@ async def ws_exam_events(websocket: WebSocket, exam_id: str) -> None:
                     session["immediate_alerts"].append(alert)
                     await _fan_out(entry, alert)
 
+            # ── Trust score update (client-computed, browser-side) ──
+            elif event_type == "trust_update":
+                # Persist the latest snapshot and fan out to both the
+                # per-exam monitor and the class-wide dashboard.
+                payload = {
+                    "type":         "trust_update",
+                    "exam_id":      exam_id,
+                    "student_id":   data.get("student_id", exam_id),
+                    "student_name": data.get("student_name") or session["student_name"],
+                    "exam_name":    data.get("exam_name") or session["exam_name"],
+                    "score":        data.get("score", 100),
+                    "status":       data.get("status", "clean"),
+                    "counts":       data.get("counts", {}),
+                    "flagged":      data.get("flagged", False),
+                    "terminated":   data.get("terminated", False),
+                    "recent":       data.get("recent", []),
+                    "timestamp":    data.get("timestamp", time.time()),
+                }
+                session["integrity_score"] = payload["score"]
+                _latest_trust[exam_id] = payload
+                await _fan_out(entry, payload)
+                await _broadcast_global(payload)
+
             # ── End exam ─────────────────────────────────────
             elif event_type == "end_exam":
                 session["status"]   = "ended"
@@ -656,6 +691,7 @@ async def ws_exam_events(websocket: WebSocket, exam_id: str) -> None:
                 }
                 await websocket.send_json(ended_msg)
                 await _fan_out(entry, ended_msg)
+                await _broadcast_global({**ended_msg, "student_id": exam_id})
                 break
 
             # ── Keepalive ────────────────────────────────────
@@ -715,6 +751,51 @@ async def ws_exam_monitor(websocket: WebSocket, exam_id: str) -> None:
     finally:
         if q in entry["monitor_queues"]:
             entry["monitor_queues"].remove(q)
+        try:
+            await websocket.close()
+        except Exception:
+            pass
+
+
+# ══════════════════════════════════════════════════════════════
+#  ExamGuard — class-wide monitor WebSocket
+#  One-directional: streams trust_update + exam_ended for EVERY
+#  active session to the host's multi-student dashboard.
+# ══════════════════════════════════════════════════════════════
+
+@app.websocket("/ws/exam/monitor/all")
+async def ws_exam_monitor_all(websocket: WebSocket) -> None:
+    await websocket.accept()
+    q: asyncio.Queue = asyncio.Queue()
+    _global_monitor_queues.append(q)
+    logger.info("Class-wide monitor WS connected (%d total)", len(_global_monitor_queues))
+
+    # Replay the latest snapshot for every student so a dashboard that joins
+    # mid-exam is immediately populated.
+    try:
+        for snapshot in list(_latest_trust.values()):
+            await websocket.send_json(snapshot)
+    except Exception:
+        pass
+
+    try:
+        while True:
+            try:
+                msg = await asyncio.wait_for(q.get(), timeout=PING_INTERVAL)
+            except asyncio.TimeoutError:
+                await websocket.send_json({"type": "ping"})
+                continue
+            if msg is None:
+                break
+            await websocket.send_json(msg)
+
+    except WebSocketDisconnect:
+        logger.info("Class-wide monitor WS disconnected")
+    except Exception as exc:
+        logger.error("Class-wide monitor WS error: %s", exc)
+    finally:
+        if q in _global_monitor_queues:
+            _global_monitor_queues.remove(q)
         try:
             await websocket.close()
         except Exception:

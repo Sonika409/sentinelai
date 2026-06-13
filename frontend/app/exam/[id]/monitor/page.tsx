@@ -54,6 +54,14 @@ export default function InvigilatorMonitor({ params }: { params: { id: string } 
         })
       }
 
+      // Authoritative trust score from the student client (overrides the
+      // alert-based estimate below).
+      if (msg.type === "trust_update") {
+        const s = msg.score as number
+        setScore(s)
+        setVerdict(s >= 80 ? "CLEAN" : s >= 60 ? "SUSPICIOUS" : "FLAGGED")
+      }
+
       if (msg.type === "exam_ended") {
         handleTriggerAnalysis()
       }
