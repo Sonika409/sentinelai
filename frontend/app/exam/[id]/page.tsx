@@ -9,9 +9,12 @@ import { QUESTION_BANK, type MCQ, type SubjectBank } from "@/lib/questionBank"
 import { useTrustScore } from "@/lib/useTrustScore"
 import {
   statusFromScore,
+  DEDUCTIONS,
+  VIOLATION_LABELS,
   WARN_THRESHOLD,
   TERMINATE_THRESHOLD,
   type TrustState,
+  type ViolationType,
 } from "@/lib/trustScore"
 
 const WS_BASE = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8000"
@@ -75,6 +78,13 @@ export default function StudentExamPage({ params }: { params: { id: string } }) 
   const { state: trust, registerViolation } = useTrustScore()
   const [warnKey, setWarnKey]   = useState(0)   // bump to fire the student toast
   const warnedBelow60 = useRef(false)
+
+  // ── Debug panel (manual violation triggers; enable with ?debug=1) ──
+  const [showDebug, setShowDebug] = useState(false)
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search)
+    setShowDebug(p.get("debug") === "1")
+  }, [])
 
   const TAB_LIMIT = 5
 
@@ -529,6 +539,40 @@ export default function StudentExamPage({ params }: { params: { id: string } }) 
           {tabCount >= TAB_LIMIT - 1
             ? `WARNING: ${tabCount}/${TAB_LIMIT} tab switches — one more will terminate your exam!`
             : `Tab switching detected (${tabCount}×) — this session is being monitored.`}
+        </div>
+      )}
+
+      {/* ── Debug panel: manually fire violations (enable with ?debug=1) ── */}
+      {showDebug && (
+        <div className="fixed bottom-4 right-4 z-50 w-60 rounded-xl border border-slate-300 bg-white/95
+                        backdrop-blur shadow-xl p-3 text-slate-700">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              Debug · Trust
+            </span>
+            <span className={`text-xs font-mono font-bold ${
+              trust.score >= 80 ? "text-emerald-600"
+                : trust.score >= WARN_THRESHOLD ? "text-amber-600" : "text-red-600"
+            }`}>
+              {trust.score}/100
+            </span>
+          </div>
+          <div className="grid grid-cols-1 gap-1.5">
+            {(Object.keys(DEDUCTIONS) as ViolationType[]).map((type) => (
+              <button
+                key={type}
+                onClick={() => registerViolation(type, Date.now() / 1000)}
+                className="flex items-center justify-between text-left text-xs px-2.5 py-1.5 rounded-lg
+                           border border-slate-200 bg-slate-50 hover:bg-slate-100 transition-colors"
+              >
+                <span>{VIOLATION_LABELS[type]}</span>
+                <span className="font-mono font-semibold text-red-500">−{DEDUCTIONS[type]}</span>
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-[10px] text-slate-400 leading-snug">
+            Fires a real violation → WS sync → host dashboard. Recovers +1 / 30s when idle.
+          </p>
         </div>
       )}
     </div>
