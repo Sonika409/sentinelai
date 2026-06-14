@@ -79,6 +79,9 @@ export default function ScanPage() {
       <a href="/" className="absolute top-6 left-6 text-sentinel-muted hover:text-white text-sm flex items-center gap-1.5 transition-colors">
         ← Home
       </a>
+      <a href="/history" className="absolute top-6 right-6 text-sentinel-muted hover:text-white text-sm flex items-center gap-1.5 transition-colors font-mono border border-sentinel-border rounded-lg px-3 py-1.5 hover:border-slate-500">
+        History
+      </a>
 
       <div className="w-full max-w-xl">
         {/* Header */}

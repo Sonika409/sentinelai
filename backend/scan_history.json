@@ -1,0 +1,846 @@
+[
+  {
+    "scan_id": "bbdfacaa",
+    "domain": "www.brcmcet.edu.in",
+    "repo_url": "https://www.brcmcet.edu.in",
+    "scan_date": "2026-06-14",
+    "timestamp": 1781412959.1039138,
+    "total_vulns": 17,
+    "severity": {
+      "critical": 1,
+      "high": 4,
+      "medium": 5,
+      "low": 7
+    },
+    "risk_score": 85,
+    "overall_risk": "HIGH",
+    "vulnerabilities": [
+      {
+        "id": "PORT-3306",
+        "file": "www.brcmcet.edu.in:3306",
+        "line": 0,
+        "severity": "CRITICAL",
+        "category": "A01:2021-Broken Access Control",
+        "description": "MySQL database port exposed to internet \u2014 database directly reachable.",
+        "cve": "CVE-2012-2122 (MySQL auth bypass)",
+        "cwes": [
+          "CWE-284 Improper Access Control",
+          "CWE-89 SQL Injection"
+        ],
+        "all_cves": [
+          "CVE-2012-2122 (MySQL auth bypass)",
+          "CVE-2016-6662 (MySQL local privilege escalation)"
+        ],
+        "port": 3306,
+        "service": "MySQL",
+        "banner": "M\u0000\u0000\u0000",
+        "recommendation": "Block port 3306 at firewall. Bind MySQL to 127.0.0.1 only."
+      },
+      {
+        "id": "PORT-21",
+        "file": "www.brcmcet.edu.in:21",
+        "line": 0,
+        "severity": "HIGH",
+        "category": "A02:2021-Cryptographic Failures",
+        "description": "FTP service exposed \u2014 credentials and data transmitted in cleartext.",
+        "cve": "CVE-1999-0497 (anonymous FTP login allowed)",
+        "cwes": [
+          "CWE-319 Cleartext Transmission of Sensitive Information",
+          "CWE-287 Improper Authentication"
+        ],
+        "all_cves": [
+          "CVE-1999-0497 (anonymous FTP login allowed)",
+          "CVE-2010-4221 (ProFTPD stack overflow)"
+        ],
+        "port": 21,
+        "service": "FTP",
+        "banner": "220---------- Welcome to Pure-FTPd [privsep] [TLS] ----------",
+        "recommendation": "Disable FTP. Use SFTP (SSH port 22) or FTPS instead."
+      },
+      {
+        "id": "PORT-143",
+        "file": "www.brcmcet.edu.in:143",
+        "line": 0,
+        "severity": "HIGH",
+        "category": "A02:2021-Cryptographic Failures",
+        "description": "IMAP exposed \u2014 email credentials transmitted in cleartext.",
+        "cve": "CVE-2021-38371 (Dovecot IMAP information disclosure)",
+        "cwes": [
+          "CWE-319 Cleartext Transmission of Sensitive Information"
+        ],
+        "all_cves": [
+          "CVE-2021-38371 (Dovecot IMAP information disclosure)"
+        ],
+        "port": 143,
+        "service": "IMAP",
+        "banner": "* OK [CAPABILITY IMAP4rev1 SASL-IR LOGIN-REFERRALS ID ENABLE IDLE NAMESPACE LITERAL+ STARTTLS AUTH=PLAIN AUTH=LOGIN] Dovecot ready.",
+        "recommendation": "Use IMAPS (port 993) with TLS. Disable plaintext IMAP."
+      },
+      {
+        "id": "PORT-22",
+        "file": "www.brcmcet.edu.in:22",
+        "line": 0,
+        "severity": "MEDIUM",
+        "category": "A07:2021-Identification and Authentication Failures",
+        "description": "SSH exposed to internet \u2014 ensure latest version and key-only auth.",
+        "cve": "CVE-2024-6387 (OpenSSH regreSSHion \u2014 unauthenticated RCE)",
+        "cwes": [
+          "CWE-287 Improper Authentication",
+          "CWE-307 Improper Restriction of Excessive Authentication Attempts"
+        ],
+        "all_cves": [
+          "CVE-2024-6387 (OpenSSH regreSSHion \u2014 unauthenticated RCE)",
+          "CVE-2023-38408 (OpenSSH ssh-agent RCE)"
+        ],
+        "port": 22,
+        "service": "SSH",
+        "banner": "\u2014",
+        "recommendation": "Disable password auth; require SSH keys; restrict source IPs; run latest OpenSSH."
+      },
+      {
+        "id": "PORT-53",
+        "file": "www.brcmcet.edu.in:53",
+        "line": 0,
+        "severity": "MEDIUM",
+        "category": "A05:2021-Security Misconfiguration",
+        "description": "DNS port open \u2014 check for zone transfer and cache poisoning vulnerabilities.",
+        "cve": "CVE-2008-1447 (DNS cache poisoning \u2014 Kaminsky attack)",
+        "cwes": [
+          "CWE-200 Exposure of Sensitive Information",
+          "CWE-346 Origin Validation Error"
+        ],
+        "all_cves": [
+          "CVE-2008-1447 (DNS cache poisoning \u2014 Kaminsky attack)",
+          "CVE-2020-1350 (SIGRed \u2014 Windows DNS RCE)"
+        ],
+        "port": 53,
+        "service": "DNS",
+        "banner": "\u2014",
+        "recommendation": "Disable recursive queries for external clients; block zone transfers; enable DNSSEC."
+      },
+      {
+        "id": "PORT-80",
+        "file": "www.brcmcet.edu.in:80",
+        "line": 0,
+        "severity": "LOW",
+        "category": "A02:2021-Cryptographic Failures",
+        "description": "HTTP (unencrypted) is serving traffic \u2014 should redirect to HTTPS.",
+        "cve": null,
+        "cwes": [
+          "CWE-319 Cleartext Transmission"
+        ],
+        "all_cves": [],
+        "port": 80,
+        "service": "HTTP",
+        "banner": "HTTP/1.1 302 Found",
+        "recommendation": "Redirect all HTTP traffic to HTTPS. Add HSTS header."
+      },
+      {
+        "id": "PORT-443",
+        "file": "www.brcmcet.edu.in:443",
+        "line": 0,
+        "severity": "LOW",
+        "category": "A05:2021-Security Misconfiguration",
+        "description": "Port 443/HTTPS is open and exposed to the internet.",
+        "cve": null,
+        "cwes": [
+          "CWE-16 Configuration"
+        ],
+        "all_cves": [],
+        "port": 443,
+        "service": "HTTPS",
+        "banner": "\u2014",
+        "recommendation": "Audit whether port 443 needs to be publicly accessible."
+      },
+      {
+        "id": "PORT-587",
+        "file": "www.brcmcet.edu.in:587",
+        "line": 0,
+        "severity": "LOW",
+        "category": "A05:2021-Security Misconfiguration",
+        "description": "Port 587/SMTP-Submission is open and exposed to the internet.",
+        "cve": null,
+        "cwes": [
+          "CWE-16 Configuration"
+        ],
+        "all_cves": [],
+        "port": 587,
+        "service": "SMTP-Submission",
+        "banner": "220-rs203.webhostbox.net ESMTP Exim 4.99.4 #2 Sun, 14 Jun 2026 10:26:03 +0530",
+        "recommendation": "Audit whether port 587 needs to be publicly accessible."
+      },
+      {
+        "id": "PORT-993",
+        "file": "www.brcmcet.edu.in:993",
+        "line": 0,
+        "severity": "LOW",
+        "category": "A05:2021-Security Misconfiguration",
+        "description": "Port 993/IMAPS is open and exposed to the internet.",
+        "cve": null,
+        "cwes": [
+          "CWE-16 Configuration"
+        ],
+        "all_cves": [],
+        "port": 993,
+        "service": "IMAPS",
+        "banner": "\u2014",
+        "recommendation": "Audit whether port 993 needs to be publicly accessible."
+      },
+      {
+        "id": "VULN-001",
+        "file": "https://www.brcmcet.edu.in",
+        "line": 0,
+        "severity": "HIGH",
+        "category": "A02:2021-Cryptographic Failures",
+        "description": "Missing security header: Strict-Transport-Security",
+        "cve": null
+      },
+      {
+        "id": "VULN-002",
+        "file": "https://www.brcmcet.edu.in",
+        "line": 0,
+        "severity": "HIGH",
+        "category": "A05:2021-Security Misconfiguration",
+        "description": "Missing security header: Content-Security-Policy",
+        "cve": null
+      },
+      {
+        "id": "VULN-003",
+        "file": "https://www.brcmcet.edu.in",
+        "line": 0,
+        "severity": "MEDIUM",
+        "category": "A05:2021-Security Misconfiguration",
+        "description": "Missing security header: X-Frame-Options",
+        "cve": null
+      },
+      {
+        "id": "VULN-004",
+        "file": "https://www.brcmcet.edu.in",
+        "line": 0,
+        "severity": "MEDIUM",
+        "category": "A05:2021-Security Misconfiguration",
+        "description": "Missing security header: X-Content-Type-Options",
+        "cve": null
+      },
+      {
+        "id": "VULN-005",
+        "file": "https://www.brcmcet.edu.in",
+        "line": 0,
+        "severity": "LOW",
+        "category": "A05:2021-Security Misconfiguration",
+        "description": "Missing security header: Referrer-Policy",
+        "cve": null
+      },
+      {
+        "id": "VULN-006",
+        "file": "https://www.brcmcet.edu.in",
+        "line": 0,
+        "severity": "LOW",
+        "category": "A05:2021-Security Misconfiguration",
+        "description": "Missing security header: Permissions-Policy",
+        "cve": null
+      },
+      {
+        "id": "VULN-007",
+        "file": "https://www.brcmcet.edu.in",
+        "line": 0,
+        "severity": "LOW",
+        "category": "A05:2021-Security Misconfiguration",
+        "description": "Server information disclosed via 'server': Apache",
+        "cve": null
+      },
+      {
+        "id": "VULN-008",
+        "file": "https://www.brcmcet.edu.in",
+        "line": 0,
+        "severity": "MEDIUM",
+        "category": "A05:2021-Security Misconfiguration",
+        "description": "Insecure cookie 'PHPSESSID': missing Secure flag, missing HttpOnly flag, missing SameSite attribute",
+        "cve": null
+      }
+    ],
+    "patches": [
+      {
+        "vuln_id": "PORT-3306",
+        "file": "mysql.conf",
+        "original_code": "bind-address = 0.0.0.0",
+        "patched_code": "bind-address = 127.0.0.1",
+        "explanation": "The MySQL database port 3306 is exposed to the internet, allowing unauthorized access. By changing the bind-address from 0.0.0.0 (all available network interfaces) to 127.0.0.1 (localhost only), we restrict access to the MySQL database to only local connections, effectively blocking external access and mitigating the vulnerability."
+      },
+      {
+        "vuln_id": "PORT-21",
+        "file": "ftp_config.py",
+        "original_code": "ftp = FTP('www.brcmcet.edu.in', 21)\nftp.login()",
+        "patched_code": "import paramiko\nssh = paramiko.SSHClient()\nssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())\nssh.connect('www.brcmcet.edu.in', 22, username='username', password='password')\nsftp = ssh.open_sftp()",
+        "explanation": "The original code uses the FTP protocol, which transmits credentials and data in cleartext, making it vulnerable to eavesdropping and interception. The patched code uses the SFTP protocol over SSH, which provides encryption and secure authentication, addressing the vulnerabilities CWE-319 and CWE-287. The FTP service is replaced with SFTP, and the credentials are transmitted securely over SSH port 22."
+      },
+      {
+        "vuln_id": "PORT-143",
+        "file": "www.brcmcet.edu.in:143",
+        "original_code": "IMAP server configuration without TLS",
+        "patched_code": "IMAP server configuration with TLS enabled and plaintext authentication disabled",
+        "explanation": "The original IMAP server configuration transmitted email credentials in cleartext, making it vulnerable to eavesdropping and interception. To fix this, the IMAP server has been reconfigured to use TLS encryption (IMAPS on port 993) and plaintext authentication has been disabled. This ensures that all email credentials and communications are encrypted, preventing unauthorized access and protecting sensitive information."
+      },
+      {
+        "vuln_id": "PORT-22",
+        "file": "/etc/ssh/sshd_config",
+        "original_code": "PasswordAuthentication yes",
+        "patched_code": "PasswordAuthentication no\nChallengeResponseAuthentication no\nUsePAM no\nAuthenticationMethods publickey",
+        "explanation": "The original code allowed password authentication, which is vulnerable to brute-force attacks and other authentication failures. The patched code disables password authentication and only allows public key authentication, which is more secure. Additionally, challenge-response authentication and PAM authentication are disabled to further restrict authentication methods. This change requires users to use SSH keys for authentication, which is more secure and reduces the risk of authentication failures."
+      },
+      {
+        "vuln_id": "PORT-53",
+        "file": "named.conf",
+        "original_code": "allow-recursion { any; };",
+        "patched_code": "allow-recursion { localhost; };",
+        "explanation": "The original code allows recursive queries from any IP address, making the DNS server vulnerable to cache poisoning attacks. The patched code restricts recursive queries to only the localhost, preventing external clients from making recursive queries and reducing the risk of DNS cache poisoning attacks. Additionally, it is recommended to block zone transfers and enable DNSSEC to further secure the DNS server."
+      },
+      {
+        "vuln_id": "VULN-001",
+        "file": "https://www.brcmcet.edu.in",
+        "original_code": "No security headers set",
+        "patched_code": "HTTP/1.1 200 OK\nStrict-Transport-Security: max-age=31536000; includeSubDomains",
+        "explanation": "The Strict-Transport-Security header is added to the HTTP response to enforce HTTPS connections and prevent man-in-the-middle attacks. The max-age parameter specifies the number of seconds that the browser should remember to enforce HTTPS, and includeSubDomains applies this rule to all subdomains."
+      },
+      {
+        "vuln_id": "VULN-002",
+        "file": "https://www.brcmcet.edu.in",
+        "original_code": "",
+        "patched_code": "Content-Security-Policy: default-src 'self'; script-src 'self' https://www.brcmcet.edu.in; object-src 'none'; frame-src 'none';",
+        "explanation": "The Content-Security-Policy header was added to define which sources of content are allowed to be executed within a web page. This helps to prevent cross-site scripting (XSS) attacks by only allowing scripts to be executed from trusted sources. The 'default-src' directive sets the default policy for all resources type, 'script-src' specifies which sources of scripts are allowed, 'object-src' and 'frame-src' are set to 'none' to prevent loading of plugins and frames from any source."
+      },
+      {
+        "vuln_id": "VULN-003",
+        "file": "https://www.brcmcet.edu.in",
+        "original_code": "No security headers set",
+        "patched_code": "X-Frame-Options: DENY",
+        "explanation": "The X-Frame-Options header is used to prevent clickjacking attacks by specifying whether a page can be iframed or not. By setting this header to 'DENY', we are preventing the page from being iframed, thus mitigating the security misconfiguration vulnerability."
+      },
+      {
+        "vuln_id": "VULN-004",
+        "file": "https://www.brcmcet.edu.in",
+        "original_code": "No security headers set",
+        "patched_code": "response.headers['X-Content-Type-Options'] = 'nosniff'",
+        "explanation": "The X-Content-Type-Options header is set to 'nosniff' to prevent MIME-sniffing attacks. This header instructs the browser to respect the Content-Type header set by the server, rather than trying to sniff the content type. This helps prevent attacks like cross-site scripting (XSS) that rely on MIME-sniffing."
+      },
+      {
+        "vuln_id": "VULN-008",
+        "file": "https://www.brcmcet.edu.in",
+        "original_code": "setcookie('PHPSESSID', $session_id);",
+        "patched_code": "setcookie('PHPSESSID', $session_id, ['secure' => true, 'httponly' => true, 'samesite' => 'Strict']);",
+        "explanation": "The original code was setting a cookie without the Secure, HttpOnly, and SameSite flags. The patched code adds these flags to prevent the cookie from being sent over an insecure connection, accessed by JavaScript, and used in a cross-site request forgery (CSRF) attack. The Secure flag ensures the cookie is only sent over HTTPS, the HttpOnly flag prevents JavaScript from accessing the cookie, and the SameSite=Strict flag prevents the cookie from being sent in cross-site requests."
+      }
+    ],
+    "summary": {
+      "executive_summary": "The security audit of the BRCM CET website revealed 17 vulnerabilities, including 1 critical and 4 high-severity issues, which pose a significant risk to the security and integrity of the website and its data. The most critical issue is the exposure of the MySQL database port to the internet, allowing unauthorized access to sensitive data. Immediate attention is required to address these vulnerabilities and prevent potential security breaches.",
+      "risk_score": 85,
+      "overall_risk": "HIGH",
+      "key_recommendations": [
+        "Block port 3306 at the firewall and bind MySQL to 127.0.0.1 only to prevent unauthorized access to the database",
+        "Disable FTP and use SFTP (SSH port 22) or FTPS instead to prevent cleartext transmission of sensitive information",
+        "Use IMAPS (port 993) with TLS and disable plaintext IMAP to prevent email credentials from being transmitted in cleartext"
+      ]
+    }
+  },
+  {
+    "scan_id": "4a81fece",
+    "domain": "github.com",
+    "repo_url": "https://github.com/WebGoat/WebGoat",
+    "scan_date": "2026-06-14",
+    "timestamp": 1781412852.2604764,
+    "total_vulns": 0,
+    "severity": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    },
+    "risk_score": 0,
+    "overall_risk": "LOW",
+    "vulnerabilities": [],
+    "patches": [],
+    "summary": {
+      "executive_summary": "The security audit of the WebGoat repository did not identify any vulnerabilities, indicating a strong security posture. This suggests that the repository is well-maintained and secure. No immediate action is required to address security concerns.",
+      "risk_score": 0,
+      "overall_risk": "LOW",
+      "key_recommendations": []
+    }
+  },
+  {
+    "scan_id": "2e928e90",
+    "repo_url": "https://github.com/WebGoat/WebGoat",
+    "scan_date": "2026-06-14",
+    "timestamp": 1781412404.381425,
+    "total_vulns": 0,
+    "severity": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    },
+    "risk_score": 0,
+    "overall_risk": "LOW",
+    "vulnerabilities": [],
+    "patches": [],
+    "summary": {
+      "executive_summary": "The security audit of the WebGoat repository did not identify any vulnerabilities, indicating a strong security posture. This suggests that the repository is well-maintained and secure. Overall, the risk to the organization is low.",
+      "risk_score": 0,
+      "overall_risk": "LOW",
+      "key_recommendations": []
+    }
+  },
+  {
+    "scan_id": "3e9eee30",
+    "repo_url": "https://www.brcmcet.edu.in",
+    "scan_date": "2026-06-14",
+    "timestamp": 1781411527.9021373,
+    "total_vulns": 19,
+    "severity": {
+      "critical": 1,
+      "high": 5,
+      "medium": 5,
+      "low": 8
+    },
+    "risk_score": 85,
+    "overall_risk": "CRITICAL",
+    "vulnerabilities": [
+      {
+        "id": "PORT-3306",
+        "file": "www.brcmcet.edu.in:3306",
+        "line": 0,
+        "severity": "CRITICAL",
+        "category": "A01:2021-Broken Access Control",
+        "description": "MySQL database port exposed to internet \u2014 database directly reachable.",
+        "cve": "CVE-2012-2122 (MySQL auth bypass)",
+        "cwes": [
+          "CWE-284 Improper Access Control",
+          "CWE-89 SQL Injection"
+        ],
+        "all_cves": [
+          "CVE-2012-2122 (MySQL auth bypass)",
+          "CVE-2016-6662 (MySQL local privilege escalation)"
+        ],
+        "port": 3306,
+        "service": "MySQL",
+        "banner": "M\u0000\u0000\u0000",
+        "recommendation": "Block port 3306 at firewall. Bind MySQL to 127.0.0.1 only."
+      },
+      {
+        "id": "PORT-21",
+        "file": "www.brcmcet.edu.in:21",
+        "line": 0,
+        "severity": "HIGH",
+        "category": "A02:2021-Cryptographic Failures",
+        "description": "FTP service exposed \u2014 credentials and data transmitted in cleartext.",
+        "cve": "CVE-1999-0497 (anonymous FTP login allowed)",
+        "cwes": [
+          "CWE-319 Cleartext Transmission of Sensitive Information",
+          "CWE-287 Improper Authentication"
+        ],
+        "all_cves": [
+          "CVE-1999-0497 (anonymous FTP login allowed)",
+          "CVE-2010-4221 (ProFTPD stack overflow)"
+        ],
+        "port": 21,
+        "service": "FTP",
+        "banner": "220---------- Welcome to Pure-FTPd [privsep] [TLS] ----------",
+        "recommendation": "Disable FTP. Use SFTP (SSH port 22) or FTPS instead."
+      },
+      {
+        "id": "PORT-110",
+        "file": "www.brcmcet.edu.in:110",
+        "line": 0,
+        "severity": "HIGH",
+        "category": "A02:2021-Cryptographic Failures",
+        "description": "POP3 exposed \u2014 email credentials transmitted in cleartext.",
+        "cve": "CVE-2003-0297 (Courier POP3 buffer overflow)",
+        "cwes": [
+          "CWE-319 Cleartext Transmission of Sensitive Information"
+        ],
+        "all_cves": [
+          "CVE-2003-0297 (Courier POP3 buffer overflow)"
+        ],
+        "port": 110,
+        "service": "POP3",
+        "banner": "+OK Dovecot ready.",
+        "recommendation": "Use POP3S (port 995) with TLS. Disable plaintext POP3."
+      },
+      {
+        "id": "PORT-143",
+        "file": "www.brcmcet.edu.in:143",
+        "line": 0,
+        "severity": "HIGH",
+        "category": "A02:2021-Cryptographic Failures",
+        "description": "IMAP exposed \u2014 email credentials transmitted in cleartext.",
+        "cve": "CVE-2021-38371 (Dovecot IMAP information disclosure)",
+        "cwes": [
+          "CWE-319 Cleartext Transmission of Sensitive Information"
+        ],
+        "all_cves": [
+          "CVE-2021-38371 (Dovecot IMAP information disclosure)"
+        ],
+        "port": 143,
+        "service": "IMAP",
+        "banner": "* OK [CAPABILITY IMAP4rev1 SASL-IR LOGIN-REFERRALS ID ENABLE IDLE NAMESPACE LITERAL+ STARTTLS AUTH=PLAIN AUTH=LOGIN] Dovecot ready.",
+        "recommendation": "Use IMAPS (port 993) with TLS. Disable plaintext IMAP."
+      },
+      {
+        "id": "PORT-22",
+        "file": "www.brcmcet.edu.in:22",
+        "line": 0,
+        "severity": "MEDIUM",
+        "category": "A07:2021-Identification and Authentication Failures",
+        "description": "SSH exposed to internet \u2014 ensure latest version and key-only auth.",
+        "cve": "CVE-2024-6387 (OpenSSH regreSSHion \u2014 unauthenticated RCE)",
+        "cwes": [
+          "CWE-287 Improper Authentication",
+          "CWE-307 Improper Restriction of Excessive Authentication Attempts"
+        ],
+        "all_cves": [
+          "CVE-2024-6387 (OpenSSH regreSSHion \u2014 unauthenticated RCE)",
+          "CVE-2023-38408 (OpenSSH ssh-agent RCE)"
+        ],
+        "port": 22,
+        "service": "SSH",
+        "banner": "\u2014",
+        "recommendation": "Disable password auth; require SSH keys; restrict source IPs; run latest OpenSSH."
+      },
+      {
+        "id": "PORT-53",
+        "file": "www.brcmcet.edu.in:53",
+        "line": 0,
+        "severity": "MEDIUM",
+        "category": "A05:2021-Security Misconfiguration",
+        "description": "DNS port open \u2014 check for zone transfer and cache poisoning vulnerabilities.",
+        "cve": "CVE-2008-1447 (DNS cache poisoning \u2014 Kaminsky attack)",
+        "cwes": [
+          "CWE-200 Exposure of Sensitive Information",
+          "CWE-346 Origin Validation Error"
+        ],
+        "all_cves": [
+          "CVE-2008-1447 (DNS cache poisoning \u2014 Kaminsky attack)",
+          "CVE-2020-1350 (SIGRed \u2014 Windows DNS RCE)"
+        ],
+        "port": 53,
+        "service": "DNS",
+        "banner": "\u2014",
+        "recommendation": "Disable recursive queries for external clients; block zone transfers; enable DNSSEC."
+      },
+      {
+        "id": "PORT-80",
+        "file": "www.brcmcet.edu.in:80",
+        "line": 0,
+        "severity": "LOW",
+        "category": "A02:2021-Cryptographic Failures",
+        "description": "HTTP (unencrypted) is serving traffic \u2014 should redirect to HTTPS.",
+        "cve": null,
+        "cwes": [
+          "CWE-319 Cleartext Transmission"
+        ],
+        "all_cves": [],
+        "port": 80,
+        "service": "HTTP",
+        "banner": "HTTP/1.1 302 Found",
+        "recommendation": "Redirect all HTTP traffic to HTTPS. Add HSTS header."
+      },
+      {
+        "id": "PORT-443",
+        "file": "www.brcmcet.edu.in:443",
+        "line": 0,
+        "severity": "LOW",
+        "category": "A05:2021-Security Misconfiguration",
+        "description": "Port 443/HTTPS is open and exposed to the internet.",
+        "cve": null,
+        "cwes": [
+          "CWE-16 Configuration"
+        ],
+        "all_cves": [],
+        "port": 443,
+        "service": "HTTPS",
+        "banner": "\u2014",
+        "recommendation": "Audit whether port 443 needs to be publicly accessible."
+      },
+      {
+        "id": "PORT-587",
+        "file": "www.brcmcet.edu.in:587",
+        "line": 0,
+        "severity": "LOW",
+        "category": "A05:2021-Security Misconfiguration",
+        "description": "Port 587/SMTP-Submission is open and exposed to the internet.",
+        "cve": null,
+        "cwes": [
+          "CWE-16 Configuration"
+        ],
+        "all_cves": [],
+        "port": 587,
+        "service": "SMTP-Submission",
+        "banner": "220-rs203.webhostbox.net ESMTP Exim 4.99.4 #2 Sun, 14 Jun 2026 10:02:09 +0530",
+        "recommendation": "Audit whether port 587 needs to be publicly accessible."
+      },
+      {
+        "id": "PORT-993",
+        "file": "www.brcmcet.edu.in:993",
+        "line": 0,
+        "severity": "LOW",
+        "category": "A05:2021-Security Misconfiguration",
+        "description": "Port 993/IMAPS is open and exposed to the internet.",
+        "cve": null,
+        "cwes": [
+          "CWE-16 Configuration"
+        ],
+        "all_cves": [],
+        "port": 993,
+        "service": "IMAPS",
+        "banner": "\u2014",
+        "recommendation": "Audit whether port 993 needs to be publicly accessible."
+      },
+      {
+        "id": "PORT-995",
+        "file": "www.brcmcet.edu.in:995",
+        "line": 0,
+        "severity": "LOW",
+        "category": "A05:2021-Security Misconfiguration",
+        "description": "Port 995/POP3S is open and exposed to the internet.",
+        "cve": null,
+        "cwes": [
+          "CWE-16 Configuration"
+        ],
+        "all_cves": [],
+        "port": 995,
+        "service": "POP3S",
+        "banner": "\u2014",
+        "recommendation": "Audit whether port 995 needs to be publicly accessible."
+      },
+      {
+        "id": "VULN-001",
+        "file": "https://www.brcmcet.edu.in",
+        "line": 0,
+        "severity": "HIGH",
+        "category": "A02:2021-Cryptographic Failures",
+        "description": "Missing security header: Strict-Transport-Security",
+        "cve": null
+      },
+      {
+        "id": "VULN-002",
+        "file": "https://www.brcmcet.edu.in",
+        "line": 0,
+        "severity": "HIGH",
+        "category": "A05:2021-Security Misconfiguration",
+        "description": "Missing security header: Content-Security-Policy",
+        "cve": null
+      },
+      {
+        "id": "VULN-003",
+        "file": "https://www.brcmcet.edu.in",
+        "line": 0,
+        "severity": "MEDIUM",
+        "category": "A05:2021-Security Misconfiguration",
+        "description": "Missing security header: X-Frame-Options",
+        "cve": null
+      },
+      {
+        "id": "VULN-004",
+        "file": "https://www.brcmcet.edu.in",
+        "line": 0,
+        "severity": "MEDIUM",
+        "category": "A05:2021-Security Misconfiguration",
+        "description": "Missing security header: X-Content-Type-Options",
+        "cve": null
+      },
+      {
+        "id": "VULN-005",
+        "file": "https://www.brcmcet.edu.in",
+        "line": 0,
+        "severity": "LOW",
+        "category": "A05:2021-Security Misconfiguration",
+        "description": "Missing security header: Referrer-Policy",
+        "cve": null
+      },
+      {
+        "id": "VULN-006",
+        "file": "https://www.brcmcet.edu.in",
+        "line": 0,
+        "severity": "LOW",
+        "category": "A05:2021-Security Misconfiguration",
+        "description": "Missing security header: Permissions-Policy",
+        "cve": null
+      },
+      {
+        "id": "VULN-007",
+        "file": "https://www.brcmcet.edu.in",
+        "line": 0,
+        "severity": "LOW",
+        "category": "A05:2021-Security Misconfiguration",
+        "description": "Server information disclosed via 'server': Apache",
+        "cve": null
+      },
+      {
+        "id": "VULN-008",
+        "file": "https://www.brcmcet.edu.in",
+        "line": 0,
+        "severity": "MEDIUM",
+        "category": "A05:2021-Security Misconfiguration",
+        "description": "Insecure cookie 'PHPSESSID': missing Secure flag, missing HttpOnly flag, missing SameSite attribute",
+        "cve": null
+      }
+    ],
+    "patches": [
+      {
+        "vuln_id": "PORT-3306",
+        "file": "mysql.conf",
+        "original_code": "bind-address = 0.0.0.0",
+        "patched_code": "bind-address = 127.0.0.1",
+        "explanation": "The MySQL database port 3306 was exposed to the internet, allowing unauthorized access. By changing the bind-address from 0.0.0.0 (all available network interfaces) to 127.0.0.1 (localhost only), we ensure that the MySQL database is only accessible from the local machine, effectively blocking external access and mitigating the vulnerability."
+      },
+      {
+        "vuln_id": "PORT-21",
+        "file": "ftp_config.py",
+        "original_code": "ftp = FTP('www.brcmcet.edu.in', 21)\nftp.login()",
+        "patched_code": "import paramiko\nssh = paramiko.SSHClient()\nssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())\nssh.connect('www.brcmcet.edu.in', 22, username='username', password='password')\nsftp = ssh.open_sftp()",
+        "explanation": "The original code uses the FTP protocol, which transmits credentials and data in cleartext, making it vulnerable to eavesdropping and interception. The patched code uses the SFTP protocol over SSH, which provides encryption and secure authentication, addressing the vulnerabilities CWE-319 and CWE-287. The FTP service is replaced with SFTP, and the credentials are transmitted securely over SSH port 22."
+      },
+      {
+        "vuln_id": "PORT-110",
+        "file": "www.brcmcet.edu.in:110",
+        "original_code": "POP3 server configuration without TLS",
+        "patched_code": "POP3S server configuration with TLS on port 995",
+        "explanation": "The original code used a plaintext POP3 server, which transmitted email credentials in cleartext, making it vulnerable to eavesdropping and interception. The patched code uses POP3S with TLS on port 995, encrypting the communication and protecting sensitive information. This change addresses the CWE-319 vulnerability by ensuring that sensitive information is no longer transmitted in cleartext."
+      },
+      {
+        "vuln_id": "PORT-143",
+        "file": "www.brcmcet.edu.in:143",
+        "original_code": "IMAP server configuration without TLS",
+        "patched_code": "IMAP server configuration with TLS enabled and plaintext authentication disabled",
+        "explanation": "To fix the vulnerability, the IMAP server should be configured to use TLS encryption and disable plaintext authentication. This can be achieved by using IMAPS (port 993) instead of IMAP (port 143) and configuring the server to only allow encrypted connections. Additionally, plaintext authentication methods such as AUTH=PLAIN and AUTH=LOGIN should be disabled in favor of more secure methods. The Dovecot configuration file should be updated to include the following lines: ssl_cert = </path/to/ssl/cert ssl_key = </path/to/ssl/key ssl_prefer_server_ciphers = yes disable_plaintext_auth = yes"
+      },
+      {
+        "vuln_id": "PORT-22",
+        "file": "/etc/ssh/sshd_config",
+        "original_code": "PasswordAuthentication yes",
+        "patched_code": "PasswordAuthentication no\nChallengeResponseAuthentication no\nUsePAM no\nAuthenticationMethods publickey",
+        "explanation": "The original code allowed password authentication, which is vulnerable to brute-force attacks and other authentication failures. The patched code disables password authentication and only allows public key authentication, which is more secure. Additionally, challenge-response authentication and PAM authentication are disabled to further restrict authentication methods. This change requires users to use SSH keys for authentication, which is more secure than password-based authentication."
+      },
+      {
+        "vuln_id": "PORT-53",
+        "file": "named.conf",
+        "original_code": "options {\n    recursion yes;\n};",
+        "patched_code": "options {\n    recursion no;\n    allow-transfer {\n        \"none\";\n    };\n    dnssec-validation yes;\n};",
+        "explanation": "The original code snippet has recursion enabled, which allows external clients to perform recursive queries and potentially exploit DNS cache poisoning vulnerabilities. The patched code disables recursion for external clients, blocks zone transfers, and enables DNSSEC validation to prevent these types of attacks."
+      },
+      {
+        "vuln_id": "VULN-001",
+        "file": "https://www.brcmcet.edu.in",
+        "original_code": "No security headers set",
+        "patched_code": "HTTP/1.1 200 OK\nStrict-Transport-Security: max-age=31536000; includeSubDomains",
+        "explanation": "The Strict-Transport-Security header is added to ensure that the browser only connects to the server over a secure connection, preventing man-in-the-middle attacks and eavesdropping. The max-age parameter specifies the number of seconds that the browser should remember this setting, and includeSubDomains applies this setting to all subdomains."
+      },
+      {
+        "vuln_id": "VULN-002",
+        "file": "https://www.brcmcet.edu.in",
+        "original_code": "",
+        "patched_code": "Content-Security-Policy: default-src 'self'; script-src 'self' https://www.brcmcet.edu.in; object-src 'none'; frame-src 'none';",
+        "explanation": "The Content-Security-Policy header was added to define which sources of content are allowed to be executed within a web page. This helps to prevent cross-site scripting (XSS) attacks by only allowing scripts to be executed from trusted sources. The 'default-src 'self'' directive specifies that content should only be loaded from the same origin. The 'script-src' directive specifies which sources are allowed to load scripts. The 'object-src' and 'frame-src' directives are set to 'none' to prevent loading of plugins and frames from any source."
+      },
+      {
+        "vuln_id": "VULN-003",
+        "file": "https://www.brcmcet.edu.in",
+        "original_code": "No security headers set",
+        "patched_code": "X-Frame-Options: DENY",
+        "explanation": "The X-Frame-Options header is used to prevent clickjacking attacks by specifying whether a page can be iframed or not. By setting this header to 'DENY', we are preventing the page from being iframed, thus mitigating the security misconfiguration vulnerability."
+      },
+      {
+        "vuln_id": "VULN-004",
+        "file": "https://www.brcmcet.edu.in",
+        "original_code": "No security headers set",
+        "patched_code": "response.headers['X-Content-Type-Options'] = 'nosniff'",
+        "explanation": "The X-Content-Type-Options header is set to 'nosniff' to prevent MIME-sniffing attacks. This header instructs the browser to respect the Content-Type header set by the server, rather than trying to sniff the content type. This helps prevent attacks like cross-site scripting (XSS) that rely on MIME-sniffing."
+      },
+      {
+        "vuln_id": "VULN-008",
+        "file": "https://www.brcmcet.edu.in",
+        "original_code": "setcookie('PHPSESSID', $session_id);",
+        "patched_code": "setcookie('PHPSESSID', $session_id, ['secure' => true, 'httponly' => true, 'samesite' => 'Strict']);",
+        "explanation": "The original code was setting a cookie without the Secure, HttpOnly, and SameSite flags. The patched code adds these flags to prevent the cookie from being sent over an insecure connection, accessed by JavaScript, and used in a cross-site request forgery (CSRF) attack. The Secure flag ensures the cookie is only sent over HTTPS, the HttpOnly flag prevents JavaScript from accessing the cookie, and the SameSite=Strict flag prevents the cookie from being sent in cross-site requests."
+      }
+    ],
+    "summary": {
+      "executive_summary": "The security audit of the BRCM College of Engineering and Technology website revealed 19 vulnerabilities, including 1 critical and 5 high-severity issues, primarily related to exposed database and email services. Immediate attention is required to address these vulnerabilities and prevent potential data breaches. The top recommendations include blocking the MySQL database port, disabling FTP and plaintext email services, and securing SSH access.",
+      "risk_score": 85,
+      "overall_risk": "CRITICAL",
+      "key_recommendations": [
+        "Block port 3306 at the firewall and bind MySQL to 127.0.0.1 only to prevent unauthorized database access",
+        "Disable FTP and plaintext email services (POP3 and IMAP), and use secure alternatives like SFTP, FTPS, POP3S, and IMAPS instead",
+        "Secure SSH access by disabling password authentication, requiring SSH keys, restricting source IPs, and running the latest OpenSSH version"
+      ]
+    }
+  },
+  {
+    "scan_id": "26ed8c89",
+    "repo_url": "https://github.com/WebGoat/WebGoat",
+    "scan_date": "2026-06-14",
+    "timestamp": 1781411480.3197193,
+    "total_vulns": 0,
+    "severity": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    },
+    "risk_score": 0,
+    "overall_risk": "LOW",
+    "vulnerabilities": [],
+    "patches": [],
+    "summary": {
+      "executive_summary": "The security audit of the WebGoat repository did not identify any vulnerabilities, indicating a strong security posture. This suggests that the repository is well-maintained and secure. Overall, the risk to the organization is low.",
+      "risk_score": 0,
+      "overall_risk": "LOW",
+      "key_recommendations": []
+    }
+  },
+  {
+    "scan_id": "a26503d6",
+    "repo_url": "https://github.com/webpwnized/mutillidae",
+    "scan_date": "2026-06-14",
+    "timestamp": 1781411455.2229936,
+    "total_vulns": 0,
+    "severity": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    },
+    "risk_score": 0,
+    "overall_risk": "LOW",
+    "vulnerabilities": [],
+    "patches": [],
+    "summary": {
+      "executive_summary": "The security audit of the Mutillidae repository did not identify any vulnerabilities, indicating a strong security posture. The repository appears to be well-maintained and secure. No critical or high-severity issues were found.",
+      "risk_score": 0,
+      "overall_risk": "LOW",
+      "key_recommendations": []
+    }
+  },
+  {
+    "scan_id": "e5795c0e",
+    "repo_url": "https://github.com/webpwnized/mutillidae",
+    "scan_date": "2026-06-14",
+    "timestamp": 1781411423.7656662,
+    "total_vulns": 0,
+    "severity": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    },
+    "risk_score": 0,
+    "overall_risk": "LOW",
+    "vulnerabilities": [],
+    "patches": [],
+    "summary": {
+      "executive_summary": "The security audit of the Mutillidae repository revealed no vulnerabilities, indicating a strong security posture. The repository appears to be well-maintained, with no critical or high-severity issues identified. Overall, the risk to the repository is low.",
+      "risk_score": 0,
+      "overall_risk": "LOW",
+      "key_recommendations": []
+    }
+  }
+]
