@@ -87,14 +87,22 @@ async def _save_history(records: list[dict]) -> None:
 
 async def _append_scan_history(scan_id: str, repo_url: str, report: dict, started_at: float) -> None:
     """Persist a completed scan to scan_history.json. Called only on success."""
+    from urllib.parse import urlparse
     vulns: list[dict] = report.get("vulnerabilities", [])
     sev: dict[str, int] = {}
     for v in vulns:
         s = v.get("severity", "UNKNOWN")
         sev[s] = sev.get(s, 0) + 1
 
+    try:
+        parsed = urlparse(repo_url if "://" in repo_url else f"https://{repo_url}")
+        domain = parsed.netloc or parsed.path.split("/")[0]
+    except Exception:
+        domain = repo_url
+
     record = {
         "scan_id":         scan_id,
+        "domain":          domain,
         "repo_url":        repo_url,
         "scan_date":       time.strftime("%Y-%m-%d", time.gmtime(started_at)),
         "timestamp":       started_at,
@@ -110,11 +118,11 @@ async def _append_scan_history(scan_id: str, repo_url: str, report: dict, starte
 
     async with _history_lock:
         records = _load_history()
-        # Replace if scan_id already in history (re-scan edge case)
+        # Never overwrite — each scan is a new entry; only deduplicate same scan_id
         records = [r for r in records if r.get("scan_id") != scan_id]
         records.insert(0, record)
         _HISTORY_FILE.write_text(json.dumps(records, indent=2))
-    logger.info("Scan %s saved to history (%d total)", scan_id, len(records) + 1)
+    logger.info("Scan %s (%s) saved to history (%d total)", scan_id, domain, len(records) + 1)
 
 # ── Operational limits (overridable via environment) ──────────
 MAX_CONCURRENT_SCANS   = int(os.getenv("MAX_CONCURRENT_SCANS", "3"))
@@ -339,6 +347,86 @@ async def list_scans() -> list[ScanSummary]:
 async def list_scan_history() -> list[dict]:
     """Return all completed scans from history, newest first."""
     return _load_history()
+
+
+@app.get("/api/scans/history/domains")
+async def list_history_domains() -> list[dict]:
+    """Return one summary entry per unique domain, newest scan first."""
+    records = _load_history()
+    seen: dict[str, dict] = {}
+    for r in records:                          # records are newest-first
+        d = r.get("domain", r.get("repo_url", ""))
+        if d not in seen:
+            seen[d] = {
+                "domain":       d,
+                "latest_scan":  r,
+                "scan_count":   0,
+                "scans":        [],
+            }
+        seen[d]["scan_count"] += 1
+        seen[d]["scans"].append({
+            "scan_id":    r["scan_id"],
+            "timestamp":  r["timestamp"],
+            "scan_date":  r["scan_date"],
+            "risk_score": r["risk_score"],
+            "overall_risk": r["overall_risk"],
+            "total_vulns":  r["total_vulns"],
+            "severity":     r["severity"],
+        })
+    return list(seen.values())
+
+
+@app.get("/api/scans/history/domain/{domain:path}")
+async def get_domain_history(domain: str) -> list[dict]:
+    """Return all scans for one domain, newest first (full records)."""
+    records = _load_history()
+    result = [r for r in records if r.get("domain", "") == domain]
+    if not result:
+        raise HTTPException(status_code=404, detail="No scans found for this domain")
+    return result
+
+
+@app.get("/api/scans/history/compare/{scan_a}/{scan_b}")
+async def compare_scans(scan_a: str, scan_b: str) -> dict:
+    """Compare two scans (scan_a = older, scan_b = newer)."""
+    records = _load_history()
+    by_id = {r["scan_id"]: r for r in records}
+    a = by_id.get(scan_a)
+    b = by_id.get(scan_b)
+    if not a or not b:
+        raise HTTPException(status_code=404, detail="One or both scans not found")
+
+    ids_a = {v["id"] for v in a.get("vulnerabilities", []) if "id" in v}
+    ids_b = {v["id"] for v in b.get("vulnerabilities", []) if "id" in v}
+
+    # Fallback: match by (file, line, category) if IDs differ across scans
+    def _key(v: dict) -> str:
+        return f"{v.get('file','')}:{v.get('line','')}:{v.get('category','')}"
+    keys_a = {_key(v) for v in a.get("vulnerabilities", [])}
+    keys_b = {_key(v) for v in b.get("vulnerabilities", [])}
+
+    fixed_ids   = ids_a - ids_b
+    new_ids     = ids_b - ids_a
+    fixed_keys  = keys_a - keys_b
+    new_keys    = keys_b - keys_a
+
+    score_delta = b["risk_score"] - a["risk_score"]
+    vuln_delta  = b["total_vulns"] - a["total_vulns"]
+
+    return {
+        "scan_a":        {"scan_id": scan_a, "timestamp": a["timestamp"], "scan_date": a["scan_date"],
+                          "risk_score": a["risk_score"], "overall_risk": a["overall_risk"],
+                          "total_vulns": a["total_vulns"], "severity": a["severity"]},
+        "scan_b":        {"scan_id": scan_b, "timestamp": b["timestamp"], "scan_date": b["scan_date"],
+                          "risk_score": b["risk_score"], "overall_risk": b["overall_risk"],
+                          "total_vulns": b["total_vulns"], "severity": b["severity"]},
+        "score_delta":   score_delta,          # negative = improvement
+        "vuln_delta":    vuln_delta,
+        "fixed_count":   len(fixed_keys),
+        "new_count":     len(new_keys),
+        "fixed_vulns":   [v for v in a.get("vulnerabilities", []) if _key(v) in fixed_keys],
+        "new_vulns":     [v for v in b.get("vulnerabilities", []) if _key(v) in new_keys],
+    }
 
 
 @app.get("/api/scans/history/{scan_id}")
